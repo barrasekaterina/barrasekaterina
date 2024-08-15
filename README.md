@@ -1,5 +1,3 @@
-![Header Image](https://drive.google.com/uc?export=view&id=1jXneMrbBzf3MBq4WHCV7ADI5dL0RoNvH)
-
 # Екатерина Баррас
 
 👤 **Полное имя:** Екатерина Баррас  
