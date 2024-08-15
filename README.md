@@ -16,24 +16,24 @@
 
 Привет! Меня зовут Екатерина Баррас, я специалист по цифровому маркетингу с глубокими знаниями в области анализа данных. Мои интересы лежат в разработке инновационных маркетинговых стратегий и использовании данных для принятия обоснованных решений.
 
-## 📂 Закрепленные репозитории
+## 📂 Основной проект
 
-[![Repository 1](https://github-readme-stats.vercel.app/api/pin/?username=barrasekaterina&repo=project1)](https://github.com/barrasekaterina/project1)
-[![Repository 2](https://github-readme-stats.vercel.app/api/pin/?username=barrasekaterina&repo=project2)](https://github.com/barrasekaterina/project2)
+[![Data Analyst Bootcamp Portfolio](https://github-readme-stats.vercel.app/api/pin/?username=barrasekaterina&repo=Data-Analyst-Bootcamp-Portfolio)](https://github.com/barrasekaterina/Data-Analyst-Bootcamp-Portfolio)
+
+**Data Analyst Bootcamp Portfolio** — Это портфолио включает в себя проекты, выполненные в рамках курса Аналитик данных на Яндекс.Практикуме. В нем представлены примеры работы с Python, SQL, статистическим анализом, визуализацией данных и построением дашбордов. Перейдите по ссылке, чтобы увидеть более подробную информацию и исходный код каждого проекта.
 
 ## 🛠️ Навыки и технологии
 
 ![Python](https://img.shields.io/badge/-Python-000?&logo=Python)
-![JavaScript](https://img.shields.io/badge/-JavaScript-000?&logo=JavaScript)
-![HTML5](https://img.shields.io/badge/-HTML5-000?&logo=HTML5)
-![CSS3](https://img.shields.io/badge/-CSS3-000?&logo=CSS3)
 ![SQL](https://img.shields.io/badge/-SQL-000?&logo=MySQL)
-![Adobe Creative Suite](https://img.shields.io/badge/-Adobe_Creative_Suite-000?&logo=Adobe)
-![WordPress](https://img.shields.io/badge/-WordPress-000?&logo=WordPress)
 ![Tableau](https://img.shields.io/badge/-Tableau-000?&logo=Tableau)
 ![Google Analytics](https://img.shields.io/badge/-Google_Analytics-000?&logo=Google-Analytics)
 ![Power BI](https://img.shields.io/badge/-Power_BI-000?&logo=Power-BI)
 ![VBA](https://img.shields.io/badge/-VBA-000?&logo=Microsoft)
+![Adobe Creative Suite](https://img.shields.io/badge/-Adobe_Creative_Suite-000?&logo=Adobe)
+![WordPress](https://img.shields.io/badge/-WordPress-000?&logo=WordPress)
+
+---
 
 ## 💼 Профессиональный опыт
 
