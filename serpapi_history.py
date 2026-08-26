@@ -31,6 +31,7 @@ CLI usage:
 import argparse
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
 import serpapi
@@ -57,29 +58,34 @@ def get_archived_searches(search_ids, api_key=None):
     return pd.DataFrame(rows)
 
 
-def get_archived_results(search_ids, api_key=None, result_key="organic_results"):
-    """Fetch each archived search by ID and return its results (e.g. organic_results),
-    one row per result, tagged with its search_id and original query."""
+def _fetch_one_result(client, search_id, result_key):
+    try:
+        result = client.search_archive(search_id=search_id)
+        query = result.get("search_parameters", {}).get("q")
+        items = result.get(result_key, [])
+        if not items:
+            # No results under result_key (e.g. still processing, errored,
+            # or this engine uses a different key) -- keep a placeholder row.
+            return [{"search_id": search_id, "query": query, "status": result.get("search_metadata", {}).get("status")}]
+        return [{"search_id": search_id, "query": query, **item} for item in items]
+    except serpapi.HTTPError as exc:
+        return [{"search_id": search_id, "status": "error", "error": str(exc)}]
+
+
+def get_archived_results(search_ids, api_key=None, result_key="organic_results", max_workers=10):
+    """Fetch each archived search by ID (concurrently) and return its results
+    (e.g. organic_results), one row per result, tagged with its search_id and query."""
     api_key = api_key or os.getenv("SERPAPI_KEY")
     if not api_key:
         raise ValueError("No API key provided. Pass api_key= or set SERPAPI_KEY.")
 
     client = serpapi.Client(api_key=api_key)
     rows = []
-    for search_id in search_ids:
-        try:
-            result = client.search_archive(search_id=search_id)
-            query = result.get("search_parameters", {}).get("q")
-            items = result.get(result_key, [])
-            if not items:
-                # No results under result_key (e.g. still processing, errored,
-                # or this engine uses a different key) -- keep a placeholder row.
-                rows.append({"search_id": search_id, "query": query, "status": result.get("search_metadata", {}).get("status")})
-                continue
-            for item in items:
-                rows.append({"search_id": search_id, "query": query, **item})
-        except serpapi.HTTPError as exc:
-            rows.append({"search_id": search_id, "status": "error", "error": str(exc)})
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_fetch_one_result, client, sid, result_key): sid for sid in search_ids}
+        for i, future in enumerate(as_completed(futures), 1):
+            rows.extend(future.result())
+            print(f"fetched {i}/{len(search_ids)}", end="\r")
 
     return pd.DataFrame(rows)
 
