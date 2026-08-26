@@ -58,9 +58,9 @@ def get_archived_searches(search_ids, api_key=None):
     return pd.DataFrame(rows)
 
 
-def _fetch_one_result(client, search_id, result_key):
+def _fetch_one_result(client, search_id, result_key, timeout):
     try:
-        result = client.search_archive(search_id=search_id)
+        result = client.search_archive(search_id=search_id, timeout=timeout)
         query = result.get("search_parameters", {}).get("q")
         engine = result.get("search_parameters", {}).get("engine")
         status = result.get("search_metadata", {}).get("status")
@@ -83,25 +83,50 @@ def _fetch_one_result(client, search_id, result_key):
 
         # Unknown/empty shape -- keep a placeholder row rather than dropping it silently.
         return [{"search_id": search_id, "query": query, "engine": engine, "status": status}]
-    except serpapi.HTTPError as exc:
+    except Exception as exc:
+        # Catch everything (HTTPError, TimeoutError, connection errors, ...) so one bad
+        # search_id can't silently hang or crash the whole batch.
         return [{"search_id": search_id, "status": "error", "error": str(exc)}]
 
 
-def get_archived_results(search_ids, api_key=None, result_key="organic_results", max_workers=10):
+def get_archived_results(search_ids, api_key=None, result_key="organic_results",
+                          max_workers=10, timeout=20, checkpoint_path=None, checkpoint_every=200):
     """Fetch each archived search by ID (concurrently) and return its results.
     Uses `organic_results` when present; falls back to the AI-answer shape
-    (reconstructed_markdown + references) used by engines like google_ai_mode."""
+    (reconstructed_markdown + references) used by engines like google_ai_mode.
+
+    Pass checkpoint_path to save progress to a CSV every `checkpoint_every` completions
+    and to resume automatically -- search_ids already present in that file are skipped.
+    """
     api_key = api_key or os.getenv("SERPAPI_KEY")
     if not api_key:
         raise ValueError("No API key provided. Pass api_key= or set SERPAPI_KEY.")
 
-    client = serpapi.Client(api_key=api_key)
     rows = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_fetch_one_result, client, sid, result_key): sid for sid in search_ids}
-        for i, future in enumerate(as_completed(futures), 1):
-            rows.extend(future.result())
-            print(f"fetched {i}/{len(search_ids)}", end="\r")
+    if checkpoint_path and os.path.exists(checkpoint_path):
+        existing = pd.read_csv(checkpoint_path)
+        rows = existing.to_dict("records")
+        done_ids = set(existing["search_id"])
+        search_ids = [sid for sid in search_ids if sid not in done_ids]
+        print(f"resuming: {len(done_ids)} already done, {len(search_ids)} remaining")
+
+    client = serpapi.Client(api_key=api_key)
+    total = len(search_ids)
+    completed = 0
+
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_fetch_one_result, client, sid, result_key, timeout): sid for sid in search_ids}
+            for future in as_completed(futures):
+                rows.extend(future.result())
+                completed += 1
+                print(f"fetched {completed}/{total}", end="\r")
+
+                if checkpoint_path and completed % checkpoint_every == 0:
+                    pd.DataFrame(rows).to_csv(checkpoint_path, index=False)
+    finally:
+        if checkpoint_path:
+            pd.DataFrame(rows).to_csv(checkpoint_path, index=False)
 
     return pd.DataFrame(rows)
 
