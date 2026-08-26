@@ -12,15 +12,20 @@ fact -- check your SerpApi dashboard at https://serpapi.com/searches for a manua
 export option instead.
 
 Notebook usage:
-    from serpapi_history import get_archived_searches
+    from serpapi_history import get_archived_searches, get_archived_results
 
-    df = get_archived_searches(["5b50d58a304bda2fca30bac9", "..."], api_key="YOUR_KEY")
-    df.to_csv("search_history.csv", index=False)
+    # metadata only (status, query, timestamps) -- one row per search_id
+    meta_df = get_archived_searches(["5b50d58a304bda2fca30bac9", "..."], api_key="YOUR_KEY")
+
+    # full results -- one row per organic result, tagged with its search_id
+    results_df = get_archived_results(["5b50d58a304bda2fca30bac9", "..."], api_key="YOUR_KEY")
+    results_df.to_csv("search_results.csv", index=False)
 
 CLI usage:
     export SERPAPI_KEY=your_api_key
     python serpapi_history.py --search-ids id1 id2 id3 -o search_history.csv
     # or: python serpapi_history.py --ids-file ids.txt -o search_history.csv
+    # add --results to export full results instead of just metadata
 """
 
 import argparse
@@ -52,6 +57,33 @@ def get_archived_searches(search_ids, api_key=None):
     return pd.DataFrame(rows)
 
 
+def get_archived_results(search_ids, api_key=None, result_key="organic_results"):
+    """Fetch each archived search by ID and return its results (e.g. organic_results),
+    one row per result, tagged with its search_id and original query."""
+    api_key = api_key or os.getenv("SERPAPI_KEY")
+    if not api_key:
+        raise ValueError("No API key provided. Pass api_key= or set SERPAPI_KEY.")
+
+    client = serpapi.Client(api_key=api_key)
+    rows = []
+    for search_id in search_ids:
+        try:
+            result = client.search_archive(search_id=search_id)
+            query = result.get("search_parameters", {}).get("q")
+            items = result.get(result_key, [])
+            if not items:
+                # No results under result_key (e.g. still processing, errored,
+                # or this engine uses a different key) -- keep a placeholder row.
+                rows.append({"search_id": search_id, "query": query, "status": result.get("search_metadata", {}).get("status")})
+                continue
+            for item in items:
+                rows.append({"search_id": search_id, "query": query, **item})
+        except serpapi.HTTPError as exc:
+            rows.append({"search_id": search_id, "status": "error", "error": str(exc)})
+
+    return pd.DataFrame(rows)
+
+
 def load_search_ids(args):
     search_ids = list(args.search_ids or [])
     if args.ids_file:
@@ -67,6 +99,7 @@ def main():
     parser.add_argument("--search-ids", nargs="+", help="One or more search_id values")
     parser.add_argument("--ids-file", help="Path to a text file with one search_id per line")
     parser.add_argument("--api-key", default=os.getenv("SERPAPI_KEY"), help="SerpApi API key (default: $SERPAPI_KEY)")
+    parser.add_argument("--results", action="store_true", help="Export full results (organic_results) instead of just metadata")
     parser.add_argument("-o", "--output", default="search_history.csv", help="Output CSV path")
     args, _unknown = parser.parse_known_args()
 
@@ -74,9 +107,12 @@ def main():
         sys.exit("No API key provided. Set SERPAPI_KEY or pass --api-key.")
 
     search_ids = load_search_ids(args)
-    df = get_archived_searches(search_ids, api_key=args.api_key)
+    if args.results:
+        df = get_archived_results(search_ids, api_key=args.api_key)
+    else:
+        df = get_archived_searches(search_ids, api_key=args.api_key)
     df.to_csv(args.output, index=False)
-    print(f"Exported {len(df)} archived searches to {args.output}")
+    print(f"Exported {len(df)} rows to {args.output}")
 
 
 if __name__ == "__main__":
