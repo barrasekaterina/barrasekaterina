@@ -62,19 +62,35 @@ def _fetch_one_result(client, search_id, result_key):
     try:
         result = client.search_archive(search_id=search_id)
         query = result.get("search_parameters", {}).get("q")
+        engine = result.get("search_parameters", {}).get("engine")
+        status = result.get("search_metadata", {}).get("status")
+
         items = result.get(result_key, [])
-        if not items:
-            # No results under result_key (e.g. still processing, errored,
-            # or this engine uses a different key) -- keep a placeholder row.
-            return [{"search_id": search_id, "query": query, "status": result.get("search_metadata", {}).get("status")}]
-        return [{"search_id": search_id, "query": query, **item} for item in items]
+        if items:
+            return [{"search_id": search_id, "query": query, **item} for item in items]
+
+        if "reconstructed_markdown" in result:
+            # google_ai_mode (and similar AI-answer engines) have no organic_results --
+            # the actual answer text lives in reconstructed_markdown, with sources in references.
+            return [{
+                "search_id": search_id,
+                "query": query,
+                "engine": engine,
+                "status": status,
+                "answer": result.get("reconstructed_markdown"),
+                "references": result.get("references", []),
+            }]
+
+        # Unknown/empty shape -- keep a placeholder row rather than dropping it silently.
+        return [{"search_id": search_id, "query": query, "engine": engine, "status": status}]
     except serpapi.HTTPError as exc:
         return [{"search_id": search_id, "status": "error", "error": str(exc)}]
 
 
 def get_archived_results(search_ids, api_key=None, result_key="organic_results", max_workers=10):
-    """Fetch each archived search by ID (concurrently) and return its results
-    (e.g. organic_results), one row per result, tagged with its search_id and query."""
+    """Fetch each archived search by ID (concurrently) and return its results.
+    Uses `organic_results` when present; falls back to the AI-answer shape
+    (reconstructed_markdown + references) used by engines like google_ai_mode."""
     api_key = api_key or os.getenv("SERPAPI_KEY")
     if not api_key:
         raise ValueError("No API key provided. Pass api_key= or set SERPAPI_KEY.")
