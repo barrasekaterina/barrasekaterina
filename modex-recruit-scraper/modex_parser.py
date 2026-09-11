@@ -24,8 +24,10 @@ STAT_LABELS = {
 }
 
 FIELDS = [
+    "record_id",
     "name",
     "profile_url",
+    "profile_photo_url",
     "nmls_id",
     "employer_type",
     "employer_name",
@@ -39,8 +41,10 @@ FIELDS = [
 
 @dataclass
 class LoanOfficer:
+    record_id: Optional[str]  # Modex's internal UUID for this profile
     name: Optional[str]
     profile_url: Optional[str]
+    profile_photo_url: Optional[str]  # personal photo; only present when the officer has one on file
     nmls_id: Optional[str]
     employer_type: Optional[str]  # "company" or "branch"
     employer_name: Optional[str]
@@ -62,6 +66,16 @@ def parse_card(card) -> LoanOfficer:
     name_link = card.select_one('a[href*="/recruit/loan-officers/"]')
     name = _text(name_link)
     profile_url = urljoin(BASE_URL, name_link["href"]) if name_link and name_link.get("href") else None
+
+    record_id = None
+    if name_link and name_link.get("href"):
+        record_id = name_link["href"].rstrip("/").rsplit("/", 1)[-1]
+
+    # Only present when the loan officer has a photo on file; absent cards
+    # fall back to a generic default avatar client-side, so a missing <img>
+    # here just means "no personal photo", not a parsing failure.
+    photo_img = card.select_one('img[src*="/avatars/"]')
+    profile_photo_url = photo_img["src"] if photo_img and photo_img.get("src") else None
 
     nmls_span = card.find("span", string=re.compile(r"NMLS ID:"))
     nmls_id = None
@@ -90,8 +104,10 @@ def parse_card(card) -> LoanOfficer:
         stats[key] = _text(value_div)
 
     return LoanOfficer(
+        record_id=record_id,
         name=name,
         profile_url=profile_url,
+        profile_photo_url=profile_photo_url,
         nmls_id=nmls_id,
         employer_type=employer_type,
         employer_name=employer_name,
