@@ -1,0 +1,106 @@
+(function () {
+  "use strict";
+
+  const form = document.getElementById("match-form");
+  const errorBox = document.getElementById("error");
+  const uploadCard = document.querySelector("main.card:not(.wide)");
+  const resultsCard = document.getElementById("results");
+  let lastResult = null;
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  }
+
+  function clearError() {
+    errorBox.hidden = true;
+    errorBox.textContent = "";
+  }
+
+  function renderSummary(summary) {
+    const items = [
+      ["Attendees", summary.totalAttendees],
+      ["Matched Contacts", summary.matchedContacts],
+      ["Matched Leads", summary.matchedLeads],
+      ["Duplicates", summary.duplicates],
+      ["New Contacts", summary.newContacts],
+      ["Personal Emails", summary.personalEmails],
+    ];
+    const el = document.getElementById("summary");
+    el.innerHTML = items.map(([label, value]) => `<div><span>${value}</span>${label}</div>`).join("");
+  }
+
+  function renderPreview(table, displayCols) {
+    const cols = Export.orderedColumns(displayCols, table).slice(0, 10);
+    const head = document.getElementById("preview-head");
+    head.innerHTML = cols.map((c) => `<th>${escapeHtml(c)}</th>`).join("");
+
+    const body = document.getElementById("preview-body");
+    const rows = table.slice(0, 200);
+    body.innerHTML = rows
+      .map((row) => `<tr>${cols.map((c) => `<td>${escapeHtml(row[c] ?? "")}</td>`).join("")}</tr>`)
+      .join("");
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    clearError();
+
+    const tradeshowFile = document.getElementById("tradeshow_file").files[0];
+    if (!tradeshowFile) {
+      showError("Please choose a tradeshow file.");
+      return;
+    }
+    const crmContactsFile = document.getElementById("crm_contacts_file").files[0] || null;
+    const crmLeadsFile = document.getElementById("crm_leads_file").files[0] || null;
+
+    const runBtn = document.getElementById("run-btn");
+    runBtn.disabled = true;
+    runBtn.textContent = "Running...";
+
+    try {
+      const result = await Pipeline.runPipeline({ tradeshowFile, crmContactsFile, crmLeadsFile });
+      lastResult = result;
+
+      document.getElementById("detected-fields").textContent = result.detectedFields.length
+        ? ", " + result.detectedFields.map((f) => f).join(", ")
+        : "";
+      renderSummary(result.summary);
+      renderPreview(result.table, result.displayCols);
+
+      uploadCard.hidden = true;
+      resultsCard.hidden = false;
+    } catch (err) {
+      showError(err.message || String(err));
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = "Run matching";
+    }
+  });
+
+  document.getElementById("download-csv").addEventListener("click", () => {
+    if (!lastResult) return;
+    const blob = Export.toCsvBlob(lastResult.table, lastResult.displayCols);
+    Export.downloadBlob(blob, "tradeshow_vs_crm_matches.csv");
+  });
+
+  document.getElementById("download-xlsx").addEventListener("click", () => {
+    if (!lastResult) return;
+    const blob = Export.toXlsxBlob(lastResult.table, lastResult.displayCols);
+    Export.downloadBlob(blob, "tradeshow_vs_crm_matches.xlsx");
+  });
+
+  document.getElementById("run-another").addEventListener("click", () => {
+    form.reset();
+    lastResult = null;
+    resultsCard.hidden = true;
+    uploadCard.hidden = false;
+  });
+})();

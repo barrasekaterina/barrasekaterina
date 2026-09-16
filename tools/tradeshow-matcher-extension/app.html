@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tradeshow vs CRM Matcher</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <main class="card">
+    <h1>Tradeshow vs CRM Matcher</h1>
+    <p class="subtitle">
+      Everything runs locally in this tab &mdash; files are never uploaded
+      anywhere. Pick a tradeshow list plus your CRM exports; the tool
+      auto-detects whether your list has Full Name + Email, + Company Name,
+      + Phone, or all of them, and matches accordingly. No business cards.
+    </p>
+
+    <div id="error" class="error" hidden></div>
+
+    <form id="match-form">
+      <label>
+        <span>Tradeshow attendee list <em>(required, .csv or .xlsx)</em></span>
+        <input type="file" id="tradeshow_file" accept=".csv,.xlsx,.xls" required>
+      </label>
+
+      <label>
+        <span>CRM Contacts export <em>(optional, .csv, semicolon-separated)</em></span>
+        <input type="file" id="crm_contacts_file" accept=".csv">
+      </label>
+
+      <label>
+        <span>CRM Leads export <em>(optional, .csv, semicolon-separated)</em></span>
+        <input type="file" id="crm_leads_file" accept=".csv">
+      </label>
+
+      <button type="submit" id="run-btn">Run matching</button>
+    </form>
+
+    <section class="hint">
+      <h2>How field detection works</h2>
+      <ul>
+        <li><strong>Full Name</strong> is the only required column.</li>
+        <li>Any of <strong>Company Name</strong>, <strong>Phone</strong>,
+          <strong>Email</strong> that are present and non-empty are used as
+          extra matching signals, in any combination.</li>
+        <li>A tradeshow record is only reported as a match when the name
+          matches <em>and</em> at least one other available field also
+          matches.</li>
+        <li>There is no live CRM database pull in this browser-extension
+          version (a browser can't open a direct SQL Server connection) &mdash;
+          use the CSV exports, or the Python/Flask version of this tool for
+          that path.</li>
+      </ul>
+    </section>
+  </main>
+
+  <main class="card wide" id="results" hidden>
+    <h1>Match Results</h1>
+    <p class="subtitle">
+      Detected fields on your tradeshow file:
+      <strong>Full Name</strong><span id="detected-fields"></span>.
+    </p>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="actions">
+      <button id="download-csv" class="button">Download CSV</button>
+      <button id="download-xlsx" class="button secondary">Download Excel</button>
+      <button id="run-another" class="button secondary">Run another file</button>
+    </div>
+    <p class="note">
+      Excel export includes clickable CRM links but, unlike the Python
+      version of this tool, no color-coded Status column (the free
+      client-side library used here can't write cell colors).
+    </p>
+
+    <h2>Preview (first 200 rows)</h2>
+    <div class="table-wrap">
+      <table id="preview-table">
+        <thead><tr id="preview-head"></tr></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="js/cleaning.js"></script>
+  <script src="js/matching.js"></script>
+  <script src="js/enrich.js"></script>
+  <script src="js/loaders.js"></script>
+  <script src="js/pipeline.js"></script>
+  <script src="js/export.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

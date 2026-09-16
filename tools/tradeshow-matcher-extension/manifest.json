@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Tradeshow vs CRM Matcher",
+  "version": "1.0.0",
+  "description": "Match a tradeshow attendee list against CRM Contacts/Leads exports, entirely in your browser. No business cards.",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
