@@ -202,9 +202,18 @@ def load_crm_leads(file_obj) -> pd.DataFrame:
 
 
 def _col(df: pd.DataFrame, name: str) -> pd.Series:
-    """Fetch a column as a string Series, or an all-empty Series if absent."""
+    """Fetch a column as a string Series, or an all-empty Series if absent.
+
+    Converts element-by-element rather than df[name].fillna("").astype(str):
+    fillna("") raises "Invalid value '' for dtype Int64" on nullable-integer
+    columns (e.g. iBitrix_Contact_NMLS, which pandas' read_sql returns as
+    Int64) because you can't insert a string into an integer-typed array.
+    astype(object) first avoids .apply() silently upcasting a nullable
+    Int64 column with missing values to float64 (which would turn 1111
+    into "1111.0").
+    """
     if name in df.columns:
-        return df[name].fillna("").astype(str)
+        return df[name].astype(object).apply(lambda x: "" if pd.isna(x) else str(x))
     return pd.Series([""] * len(df), index=df.index)
 
 

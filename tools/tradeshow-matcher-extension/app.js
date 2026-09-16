@@ -49,6 +49,16 @@
       .replace(/>/g, "&gt;");
   }
 
+  const progressBox = document.getElementById("progress");
+  function showProgress(text) {
+    progressBox.innerHTML = `<span class="spinner"></span><span>${escapeHtml(text)}</span>`;
+    progressBox.hidden = false;
+  }
+  function hideProgress() {
+    progressBox.hidden = true;
+    progressBox.innerHTML = "";
+  }
+
   const dbFieldsBox = document.getElementById("db-fields");
   function anyLiveSourceSelected() {
     return (
@@ -94,12 +104,14 @@
       let crmLeadsRows = null;
 
       if (contactsSource === "live") {
+        showProgress("Fetching CRM Contacts from the local backend...");
         crmContactsRows = await DbClient.fetchContactsLive(backendUrl, { server: dbServer });
       } else {
         crmContactsFile = document.getElementById("crm_contacts_file").files[0] || null;
       }
 
       if (leadsSource === "live") {
+        showProgress("Fetching CRM Leads from the local backend...");
         crmLeadsRows = await DbClient.fetchLeadsLive(backendUrl, { server: dbServer });
       } else {
         crmLeadsFile = document.getElementById("crm_leads_file").files[0] || null;
@@ -111,6 +123,7 @@
         crmLeadsFile,
         crmContactsRows,
         crmLeadsRows,
+        onProgress: showProgress,
       });
       lastResult = result;
 
@@ -127,6 +140,7 @@
     } finally {
       runBtn.disabled = false;
       runBtn.textContent = "Run matching";
+      hideProgress();
     }
   });
 

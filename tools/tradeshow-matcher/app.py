@@ -62,7 +62,9 @@ def run():
     try:
         if request.form.get("crm_contacts_source") == "live":
             server = request.form.get("db_server") or None
+            print(f"[matcher] Fetching CRM Contacts live from {server or 'default server'}...", flush=True)
             raw = db.fetch_contacts(server=server)
+            print(f"[matcher] Got {len(raw)} contact rows, standardizing...", flush=True)
             crm_contacts_df = loaders.standardize_db_contacts(raw)
         else:
             uploaded = request.files.get("crm_contacts_file")
@@ -71,15 +73,19 @@ def run():
 
         if request.form.get("crm_leads_source") == "live":
             server = request.form.get("db_server") or None
+            print(f"[matcher] Fetching CRM Leads live from {server or 'default server'}...", flush=True)
             raw = db.fetch_leads(server=server)
+            print(f"[matcher] Got {len(raw)} lead rows, standardizing...", flush=True)
             crm_leads_df = loaders.standardize_db_leads(raw)
         else:
             uploaded = request.files.get("crm_leads_file")
             if uploaded and uploaded.filename:
                 crm_leads_file = io.BytesIO(uploaded.read())
     except Exception as exc:  # noqa: BLE001 - surface any DB/driver error to the user
+        print(f"[matcher] CRM database pull failed: {exc}", flush=True)
         return render_template("index.html", error=f"CRM database pull failed: {exc}")
 
+    print("[matcher] Running the match against the tradeshow file...", flush=True)
     try:
         result = run_pipeline(
             tradeshow_file=io.BytesIO(tradeshow.read()),
@@ -90,11 +96,19 @@ def run():
             crm_leads_df=crm_leads_df,
         )
     except ValueError as exc:
+        print(f"[matcher] Failed: {exc}", flush=True)
         return render_template("index.html", error=str(exc))
 
+    print(
+        f"[matcher] Done: {result.summary['total_attendees']} attendees, "
+        f"{result.summary['matched_contacts']} matched contacts, "
+        f"{result.summary['matched_leads']} matched leads. Writing Excel...",
+        flush=True,
+    )
     token = uuid.uuid4().hex
     out_path = os.path.join(RESULTS_DIR, f"{token}.xlsx")
     write_excel(result.table, out_path)
+    print(f"[matcher] Ready: {out_path}", flush=True)
 
     preview_cols = list(result.table.columns[:10])
     preview_rows = result.table[preview_cols].head(200).fillna("").astype(str).values.tolist()
@@ -115,10 +129,14 @@ def api_contacts():
         return "", 204
 
     payload = request.get_json(silent=True) or {}
+    server = payload.get("server") or None
+    print(f"[matcher] (extension) Fetching CRM Contacts live from {server or 'default server'}...", flush=True)
     try:
-        raw = db.fetch_contacts(server=payload.get("server") or None)
+        raw = db.fetch_contacts(server=server)
+        print(f"[matcher] (extension) Got {len(raw)} contact rows.", flush=True)
         standardized = loaders.standardize_db_contacts(raw)
     except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
+        print(f"[matcher] (extension) Contacts fetch failed: {exc}", flush=True)
         return jsonify(error=str(exc)), 500
     return jsonify(rows=standardized.fillna("").to_dict(orient="records"))
 
@@ -129,10 +147,14 @@ def api_leads():
         return "", 204
 
     payload = request.get_json(silent=True) or {}
+    server = payload.get("server") or None
+    print(f"[matcher] (extension) Fetching CRM Leads live from {server or 'default server'}...", flush=True)
     try:
-        raw = db.fetch_leads(server=payload.get("server") or None)
+        raw = db.fetch_leads(server=server)
+        print(f"[matcher] (extension) Got {len(raw)} lead rows.", flush=True)
         standardized = loaders.standardize_db_leads(raw)
     except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
+        print(f"[matcher] (extension) Leads fetch failed: {exc}", flush=True)
         return jsonify(error=str(exc)), 500
     return jsonify(rows=standardized.fillna("").to_dict(orient="records"))
 

@@ -19,7 +19,7 @@
       <div class="error">{{ error }}</div>
     {% endif %}
 
-    <form action="{{ url_for('run') }}" method="post" enctype="multipart/form-data">
+    <form id="match-form" action="{{ url_for('run') }}" method="post" enctype="multipart/form-data">
       <label>
         <span>Tradeshow attendee list <em>(required, .csv or .xlsx)</em></span>
         <input type="file" name="tradeshow_file" accept=".csv,.xlsx,.xls" required>
@@ -71,7 +71,14 @@
         </p>
       </div>
 
-      <button type="submit">Run matching</button>
+      <button type="submit" id="run-btn">Run matching</button>
+      <p id="progress" class="progress" hidden>
+        <span class="spinner"></span>
+        <span>Running &mdash; this page will reload with results. Large CRM
+          exports or a live database pull can take a little while; watch the
+          terminal running <code>python app.py</code> for step-by-step
+          progress.</span>
+      </p>
     </form>
 
     <section class="hint">
@@ -87,5 +94,14 @@
       </ul>
     </section>
   </main>
+
+  <script>
+    document.getElementById("match-form").addEventListener("submit", function () {
+      var btn = document.getElementById("run-btn");
+      btn.disabled = true;
+      btn.textContent = "Running...";
+      document.getElementById("progress").hidden = false;
+    });
+  </script>
 </body>
 </html>

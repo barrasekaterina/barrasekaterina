@@ -103,6 +103,39 @@ label.radio input { width: auto; margin: 0; }
   font-size: 0.85rem;
 }
 
+button:disabled { opacity: 0.6; cursor: default; }
+
+.progress {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.progress .spinner {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.progress code {
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+
 .hint {
   margin-top: 28px;
   padding-top: 16px;
