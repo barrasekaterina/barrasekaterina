@@ -98,6 +98,11 @@ label.radio {
 
 label.radio input { width: auto; margin: 0; }
 
+.note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .hint {
   margin-top: 28px;
   padding-top: 16px;

@@ -62,14 +62,11 @@
           <span>CRM DB server <em>(optional, defaults to bi-02.prod.admortgage.com)</em></span>
           <input type="text" id="db_server" placeholder="bi-02.prod.admortgage.com">
         </label>
-        <label>
-          <span>DB username <em>(only needed for Contacts)</em></span>
-          <input type="text" id="db_uid" autocomplete="off">
-        </label>
-        <label>
-          <span>DB password <em>(only needed for Contacts; never stored, kept in memory for this run only)</em></span>
-          <input type="password" id="db_pwd" autocomplete="off">
-        </label>
+        <p class="note">
+          No username/password needed &mdash; both Contacts and Leads
+          authenticate via Windows Integrated Auth, using whichever account
+          the local backend is running as.
+        </p>
       </div>
 
       <button type="submit" id="run-btn">Run matching</button>
@@ -89,9 +86,8 @@
           (no browser can) &mdash; "Pull live" sends your request to the
           local Flask backend from the Python version of this tool
           (<code>tools/tradeshow-matcher</code>), which must already be
-          running on this machine and does the real database connection.
-          The DB password is only ever held in memory for the one request
-          and is never written to disk or <code>chrome.storage</code>.</li>
+          running on this machine and does the real database connection via
+          Windows Integrated Auth.</li>
       </ul>
     </section>
   </main>

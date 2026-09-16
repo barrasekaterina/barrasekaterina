@@ -48,11 +48,14 @@ For each of Contacts and Leads you can either:
 - **Pull live from the CRM database** — runs the same SQL against the
   Bitrix CRM database on `bi-02.prod.admortgage.com` that used to be a
   manual export step, so you always match against current data.
-  - Contacts uses SQL auth: fill in the DB username/password in the form
-    (sent for that request only, never stored, logged, or written to disk).
-  - Leads uses Windows Integrated Auth (`Trusted_Connection`), so it only
-    works when the tool runs on a domain-joined Windows machine, or a Linux
-    host configured for Kerberos against that domain.
+  - Both Contacts and Leads authenticate via Windows Integrated Auth
+    (`Trusted_Connection`) — no username/password is asked for or sent
+    anywhere. This only works when the tool runs on a domain-joined
+    Windows machine (or a Linux host configured for Kerberos against that
+    domain) as an account with access to the CRM database. (The original
+    contacts script also carried a UID/PWD pair, but when
+    `Trusted_Connection=yes` is present the ODBC driver ignores UID/PWD
+    entirely — that pair was never actually authenticating anything.)
   - This path needs `pyodbc` plus the system-level "ODBC Driver 17 for SQL
     Server" installed, and network access to that server — see
     `matcher/db.py` for the exact queries. It has not been exercised

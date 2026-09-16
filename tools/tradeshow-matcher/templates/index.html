@@ -35,7 +35,7 @@
         <label class="radio">
           <input type="radio" name="crm_contacts_source" value="live"
                  onchange="document.getElementById('contacts-upload').style.display='none'; document.getElementById('db-fields').style.display='block';">
-          Pull live from CRM database
+          Pull live from CRM database (Windows Integrated Auth)
         </label>
         <div id="contacts-upload">
           <input type="file" name="crm_contacts_file" accept=".csv">
@@ -64,14 +64,11 @@
           <span>CRM DB server <em>(optional, defaults to bi-02.prod.admortgage.com)</em></span>
           <input type="text" name="db_server" placeholder="bi-02.prod.admortgage.com">
         </label>
-        <label>
-          <span>DB username <em>(only needed for Contacts; leave blank to use the server's CRM_DB_USER)</em></span>
-          <input type="text" name="db_uid" autocomplete="off">
-        </label>
-        <label>
-          <span>DB password <em>(only needed for Contacts; never stored, sent for this request only)</em></span>
-          <input type="password" name="db_pwd" autocomplete="off">
-        </label>
+        <p class="note">
+          No username/password needed &mdash; both Contacts and Leads
+          authenticate via Windows Integrated Auth, using whichever account
+          this server is running as.
+        </p>
       </div>
 
       <button type="submit">Run matching</button>

@@ -1,20 +1,18 @@
 """Optional live pull of CRM Contacts/Leads straight from the Bitrix CRM
 database, as an alternative to uploading the CSV exports.
 
-Credentials are only ever taken from environment variables or the web
-form at request time; they are never written to disk, logged, or stored on
-the resulting DataFrame/session. This module needs network access to the
-internal admortgage BI server and the "ODBC Driver 17 for SQL Server"
-installed - neither is available in this sandbox, so the two fetch_*
-functions below have not been exercised against a live database. They have
+Both queries authenticate via Windows Integrated Auth (Trusted_Connection) -
+no username/password is needed or accepted. This only works from a
+domain-joined Windows machine (or a Linux box configured for Kerberos
+against that domain) logged in as an account with access to the CRM
+database - it will not work from an arbitrary Linux container, which is why
+this module needs network access to the internal admortgage BI server and
+the "ODBC Driver 17 for SQL Server" installed, neither of which is
+available in this sandbox. The two fetch_* functions below have therefore
 only been validated against a mocked DataFrame shaped like the expected
 query output (see sample_data/smoke_test_db.py) through
-standardize_db_contacts / standardize_db_leads in loaders.py.
-
-The leads query uses Trusted_Connection (Windows Integrated Auth), which
-only works from a domain-joined Windows machine or a Linux box configured
-for Kerberos against that domain - it will not work from an arbitrary
-Linux container.
+standardize_db_contacts / standardize_db_leads in loaders.py, not against a
+live database.
 """
 from __future__ import annotations
 
@@ -193,32 +191,28 @@ LEFT JOIN phones AS p ON p.ELEMENT_ID = c.ID;
 """
 
 
-def _connection_string(server: str, database: str, uid: str | None, pwd: str | None,
-                        trusted: bool) -> str:
-    parts = [
-        "DRIVER={ODBC Driver 17 for SQL Server}",
-        f"SERVER={server}",
-        f"DATABASE={database}",
-    ]
-    if trusted:
-        parts += ["Trusted_Connection=yes", "TrustServerCertificate=yes"]
-    else:
-        parts += [f"UID={uid}", f"PWD={pwd}"]
-    return ";".join(parts) + ";"
+def _connection_string(server: str, database: str) -> str:
+    # Both queries authenticate via Windows Integrated Auth. The original
+    # contacts script also carried UID/PWD alongside Trusted_Connection=yes,
+    # but when Trusted_Connection is set the ODBC driver ignores UID/PWD
+    # entirely and uses the current Windows session instead - so those
+    # credentials were never actually doing anything, and asking for them
+    # in the UI only invited a confusing SQL-auth login failure (18456).
+    return (
+        "DRIVER={ODBC Driver 17 for SQL Server};"
+        f"SERVER={server};"
+        f"DATABASE={database};"
+        "Trusted_Connection=yes;"
+        "TrustServerCertificate=yes;"
+    )
 
 
-def fetch_contacts(uid: str | None = None, pwd: str | None = None,
-                    server: str | None = None, database: str = "dm01") -> pd.DataFrame:
-    """Pull CRM contacts live. Requires a username/password (SQL auth)."""
+def fetch_contacts(server: str | None = None, database: str = "dm01") -> pd.DataFrame:
+    """Pull CRM contacts live via Windows Integrated Auth (Trusted_Connection)."""
     import pyodbc  # imported lazily: optional dependency, only needed for this path
 
     server = server or os.environ.get("CRM_DB_SERVER", "bi-02.prod.admortgage.com")
-    uid = uid or os.environ.get("CRM_DB_USER")
-    pwd = pwd or os.environ.get("CRM_DB_PASSWORD")
-    if not uid or not pwd:
-        raise ValueError("CRM database username and password are required for the contacts pull.")
-
-    conn_str = _connection_string(server, database, uid, pwd, trusted=False)
+    conn_str = _connection_string(server, database)
     with pyodbc.connect(conn_str) as conn:
         df = pd.read_sql(CONTACTS_QUERY, conn)
 
@@ -234,6 +228,6 @@ def fetch_leads(server: str | None = None, database: str = "crm") -> pd.DataFram
     import pyodbc  # imported lazily: optional dependency, only needed for this path
 
     server = server or os.environ.get("CRM_DB_SERVER", "bi-02.prod.admortgage.com")
-    conn_str = _connection_string(server, database, uid=None, pwd=None, trusted=True)
+    conn_str = _connection_string(server, database)
     with pyodbc.connect(conn_str) as conn:
         return pd.read_sql(LEADS_QUERY, conn)

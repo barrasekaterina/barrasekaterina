@@ -2,9 +2,9 @@
 // endpoints (tools/tradeshow-matcher/app.py). This exists because a
 // browser extension cannot open a direct SQL Server connection itself -
 // the actual pyodbc connection happens in that local backend, which must
-// be running on this machine. Credentials are only ever held in memory for
-// the duration of one fetch() call; nothing here writes them to disk,
-// chrome.storage, or logs them.
+// be running on this machine. Both endpoints authenticate via Windows
+// Integrated Auth server-side, so no credentials are collected or sent
+// from here at all.
 (function (global) {
   "use strict";
 
@@ -29,8 +29,8 @@
     return data.rows || [];
   }
 
-  async function fetchContactsLive(backendUrl, { server, uid, pwd }) {
-    return postJson(`${backendUrl.replace(/\/$/, "")}/api/contacts`, { server, uid, pwd });
+  async function fetchContactsLive(backendUrl, { server }) {
+    return postJson(`${backendUrl.replace(/\/$/, "")}/api/contacts`, { server });
   }
 
   async function fetchLeadsLive(backendUrl, { server }) {

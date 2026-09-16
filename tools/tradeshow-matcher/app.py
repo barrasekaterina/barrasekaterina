@@ -61,10 +61,8 @@ def run():
 
     try:
         if request.form.get("crm_contacts_source") == "live":
-            uid = request.form.get("db_uid") or None
-            pwd = request.form.get("db_pwd") or None
             server = request.form.get("db_server") or None
-            raw = db.fetch_contacts(uid=uid, pwd=pwd, server=server)
+            raw = db.fetch_contacts(server=server)
             crm_contacts_df = loaders.standardize_db_contacts(raw)
         else:
             uploaded = request.files.get("crm_contacts_file")
@@ -118,11 +116,7 @@ def api_contacts():
 
     payload = request.get_json(silent=True) or {}
     try:
-        raw = db.fetch_contacts(
-            uid=payload.get("uid") or None,
-            pwd=payload.get("pwd") or None,
-            server=payload.get("server") or None,
-        )
+        raw = db.fetch_contacts(server=payload.get("server") or None)
         standardized = loaders.standardize_db_contacts(raw)
     except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
         return jsonify(error=str(exc)), 500

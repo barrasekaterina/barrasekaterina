@@ -94,9 +94,7 @@
       let crmLeadsRows = null;
 
       if (contactsSource === "live") {
-        const uid = document.getElementById("db_uid").value;
-        const pwd = document.getElementById("db_pwd").value;
-        crmContactsRows = await DbClient.fetchContactsLive(backendUrl, { server: dbServer, uid, pwd });
+        crmContactsRows = await DbClient.fetchContactsLive(backendUrl, { server: dbServer });
       } else {
         crmContactsFile = document.getElementById("crm_contacts_file").files[0] || null;
       }
@@ -129,8 +127,6 @@
     } finally {
       runBtn.disabled = false;
       runBtn.textContent = "Run matching";
-      // Never leave the password sitting in the DOM longer than this run needs.
-      document.getElementById("db_pwd").value = "";
     }
   });
 

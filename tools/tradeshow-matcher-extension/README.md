@@ -29,16 +29,17 @@ real `pyodbc` connection and hands back standardized rows over
 process is what actually talks to the database. You need that Flask app
 running whenever you use the live-DB option — CSV upload doesn't need it.
 
-The DB password (Contacts only; Leads uses Windows Integrated Auth) is only
-ever held in the page's memory for the one request, is cleared from the
-form right after the run, and is never written to `chrome.storage` or any
-log. It does travel over plain HTTP to `127.0.0.1`, which is fine for
-localhost but don't repoint the backend URL at a non-local, non-HTTPS host.
+Both Contacts and Leads authenticate via Windows Integrated Auth
+server-side, so there's no username/password field at all — nothing to
+type, store, or send. This only works when the Flask backend is running on
+a domain-joined Windows machine (or Kerberos-configured Linux) as an
+account with access to the CRM database.
 
 CORS on the Flask side (`app.py`) is restricted to `chrome-extension://`
-origins specifically — never opened to `*` — because the Leads endpoint
-needs no credentials at all; an open CORS policy would let any website you
-happen to have open in another tab silently query it while the server runs.
+origins specifically — never opened to `*` — because neither endpoint
+needs credentials at all; an open CORS policy would let any website you
+happen to have open in another tab silently query your CRM data while the
+server runs.
 
 ## What's different from the Python/Flask version
 
