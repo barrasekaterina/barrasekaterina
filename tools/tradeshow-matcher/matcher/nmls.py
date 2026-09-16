@@ -353,6 +353,126 @@ def _finalize(df_individual, df_loc, branch_name, company_name) -> pd.DataFrame:
     return result[ENRICHMENT_COLUMNS]
 
 
+FIRST_NAME_THRESHOLD = 0.80
+LAST_NAME_THRESHOLD = 0.85
+COMPANY_THRESHOLD = 0.85
+
+
+def match_individuals_by_name(
+    attendees: pd.DataFrame,
+    server: str | None = None,
+    database: str = "NMLS",
+) -> tuple[pd.Series, pd.DataFrame]:
+    """Fallback path for attendees with no CRM match (so no MLO NMLS id to
+    look up directly): fuzzy-match their First/Last Name against
+    dbo.Individual, then use Company Name to pick the right person when a
+    name matches more than one NMLS individual.
+
+    `attendees` needs "First Name", "Last Name" columns and, ideally,
+    "Company Name" (blank is fine, but then any name collision is left
+    unmatched rather than guessed at). Returns (ids, enrichment):
+    - ids: a Series aligned to attendees.index, each value either the
+      matched IndividualNMLSID (str) or "".
+    - enrichment: fetch_nmls_enrichment() output for every candidate this
+      touched, so callers already doing CRM-based enrichment can reuse it
+      instead of a second round trip for the same ids.
+
+    dbo.Individual.LastName is matched via a plain "IN (...)" (relying on
+    SQL Server's usual case-insensitive collation), not LOWER(LastName),
+    since wrapping the column in a function would block index usage on a
+    table this large.
+    """
+    import pyodbc  # imported lazily: optional dependency, only needed for this path
+    import recordlinkage
+
+    attendees = attendees.copy()
+    attendees["First Name"] = safe_str_series(attendees["First Name"]).str.lower()
+    attendees["Last Name"] = safe_str_series(attendees["Last Name"]).str.lower()
+    attendees["Company Name"] = safe_str_series(
+        attendees["Company Name"] if "Company Name" in attendees.columns
+        else pd.Series([""] * len(attendees), index=attendees.index)
+    ).str.lower()
+
+    empty_ids = pd.Series([""] * len(attendees), index=attendees.index)
+    last_names = sorted({n for n in attendees["Last Name"] if n})
+    if not last_names:
+        return empty_ids, pd.DataFrame(columns=ENRICHMENT_COLUMNS)
+
+    server = server or os.environ.get("NMLS_DB_SERVER", "p-nmls-db01.admortgage.com")
+    conn_str = _connection_string(server, database)
+
+    with pyodbc.connect(conn_str) as conn:
+        candidates = _read_scoped(
+            conn,
+            "SELECT IndividualNMLSID, FirstName, LastName FROM dbo.Individual "
+            "WHERE IsDeleted = 0 AND LastName IN ({placeholders})",
+            last_names,
+        )
+        if candidates.empty:
+            return empty_ids, pd.DataFrame(columns=ENRICHMENT_COLUMNS)
+
+        candidates["IndividualNMLSID"] = pd.to_numeric(candidates["IndividualNMLSID"], errors="coerce").astype("Int64")
+        candidates = candidates.dropna(subset=["IndividualNMLSID"])
+        candidates = candidates.rename(columns={"FirstName": "First Name", "LastName": "Last Name"})
+        candidates["First Name"] = safe_str_series(candidates["First Name"]).str.lower()
+        candidates["Last Name"] = safe_str_series(candidates["Last Name"]).str.lower()
+
+        indexer = recordlinkage.Index()
+        indexer.block("Last Name")
+        candidate_links = indexer.index(attendees, candidates)
+
+        compare_cl = recordlinkage.Compare()
+        compare_cl.string("First Name", "First Name", method="jarowinkler",
+                           threshold=FIRST_NAME_THRESHOLD, label="first_name")
+        compare_cl.string("Last Name", "Last Name", method="jarowinkler",
+                           threshold=LAST_NAME_THRESHOLD, label="last_name")
+        features = compare_cl.compute(candidate_links, attendees, candidates)
+        features = features[(features["first_name"] > 0) & (features["last_name"] > 0)]
+
+        if features.empty:
+            return empty_ids, pd.DataFrame(columns=ENRICHMENT_COLUMNS)
+
+        # Every candidate NMLS id any attendee's name plausibly matched -
+        # resolve all of them up front so company-name disambiguation below
+        # doesn't need per-attendee round trips.
+        all_candidate_ids = candidates.loc[
+            features.index.get_level_values(1).unique(), "IndividualNMLSID"
+        ].astype("int64").unique().tolist()
+
+    enrichment = fetch_nmls_enrichment(all_candidate_ids, server=server, database=database)
+    location_name_by_id = dict(zip(enrichment["IndividualNMLSID"].astype(str), enrichment["LocationName"]))
+
+    chosen: dict[int, str] = {}
+    for attendee_idx in features.index.get_level_values(0).unique():
+        row_candidates = candidates.loc[features.loc[attendee_idx].index, "IndividualNMLSID"].astype("int64")
+        if len(row_candidates) == 1:
+            chosen[attendee_idx] = str(row_candidates.iloc[0])
+            continue
+
+        company = attendees.loc[attendee_idx, "Company Name"]
+        if not company:
+            continue  # multiple same-named people, no company to disambiguate with - leave unmatched
+
+        best_id, best_score = None, 0.0
+        for cand_id in row_candidates:
+            cand_company = location_name_by_id.get(str(cand_id), "")
+            score = jaro_winkler_similarity(company, cand_company.lower()) if cand_company else 0.0
+            if score > best_score:
+                best_id, best_score = cand_id, score
+        if best_id is not None and best_score >= COMPANY_THRESHOLD:
+            chosen[attendee_idx] = str(best_id)
+
+    ids = empty_ids.copy()
+    for idx, individual_id in chosen.items():
+        ids.loc[idx] = individual_id
+    return ids, enrichment
+
+
+def jaro_winkler_similarity(a: str, b: str) -> float:
+    import jellyfish
+    return jellyfish.jaro_winkler_similarity(a, b)
+
+
 def merge_nmls_enrichment(table: pd.DataFrame, enrichment: pd.DataFrame, mlo_nmls_col: str = "MLO NMLS") -> pd.DataFrame:
     """Left-join NMLS enrichment columns onto the matcher's result table by
     the MLO NMLS id. Rows with no MLO NMLS value, or no NMLS match, get

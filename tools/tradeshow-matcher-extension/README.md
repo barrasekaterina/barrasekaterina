@@ -45,11 +45,19 @@ server runs.
 
 The "NMLS enrichment" checkbox works the same way — it calls the Flask
 backend's `/api/nmls` endpoint with the MLO NMLS ids that matched in this
-run, and merges back `NMLS RegulationType`, `NMLS LicensingStatus`, and
-`NMLS LocationName` (the company/branch that person is currently
-authorized to represent). Same backend, same Windows Integrated Auth, same
-"only queries what actually matched" scoping — see the Flask README's
-"NMLS enrichment" section for the full details and caveats.
+run, and merges back `NMLS RegulationType`, `NMLS LicensingStatus`, `NMLS
+LocationNMLSID`, and `NMLS LocationName` (the company/branch that person
+is currently authorized to represent). Same backend, same Windows
+Integrated Auth, same "only queries what actually matched" scoping — see
+the Flask README's "NMLS enrichment" section for the full details and
+caveats.
+
+**Gap vs. the Flask version:** the Flask app also falls back to
+fuzzy-matching Name + Company Name against NMLS directly for attendees
+with *no* CRM match at all (see `matcher.nmls.match_individuals_by_name`
+and the "CRM" vs "Name+Company" `NMLS Match Method` column). That fallback
+isn't wired up here yet — this extension only enriches attendees that
+already have an MLO NMLS id from a CRM match.
 
 ## What's different from the Python/Flask version
 

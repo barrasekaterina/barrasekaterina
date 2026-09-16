@@ -12,6 +12,7 @@ import os
 import tempfile
 import uuid
 
+import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_file
 
 from matcher import db, loaders, nmls
@@ -109,12 +110,34 @@ def run():
 
     if request.form.get("enrich_nmls") == "on":
         nmls_server = request.form.get("nmls_server") or None
-        mlo_ids = [i for i in result.table.get("MLO NMLS", []) if i]
-        print(f"[matcher] Enriching {len(mlo_ids)} MLO NMLS id(s) from {nmls_server or 'default NMLS server'}...", flush=True)
+        # Priority: if an attendee matched a CRM Contact/Lead, use that
+        # record's MLO NMLS id directly - it's a known, unambiguous id.
+        # Only for attendees with no CRM match at all do we fall back to
+        # fuzzy name+company matching against NMLS itself.
+        result.table["NMLS ID Used"] = result.table.get("MLO NMLS", "")
+        result.table["NMLS Match Method"] = result.table["NMLS ID Used"].apply(lambda v: "CRM" if v else "")
         try:
-            enrichment = nmls.fetch_nmls_enrichment(mlo_ids, server=nmls_server)
-            print(f"[matcher] NMLS returned {len(enrichment)} matched individual(s).", flush=True)
-            result.table = nmls.merge_nmls_enrichment(result.table, enrichment)
+            crm_ids = [i for i in result.table["NMLS ID Used"] if i]
+            print(f"[matcher] Enriching {len(crm_ids)} MLO NMLS id(s) from CRM matches, "
+                  f"from {nmls_server or 'default NMLS server'}...", flush=True)
+            enrichment = nmls.fetch_nmls_enrichment(crm_ids, server=nmls_server)
+            print(f"[matcher] NMLS returned {len(enrichment)} matched individual(s) via CRM.", flush=True)
+
+            needs_fallback = result.table.loc[
+                result.table["NMLS ID Used"] == "", ["First Name", "Last Name", "Company Name"]
+            ]
+            if not needs_fallback.empty:
+                print(f"[matcher] Looking up {len(needs_fallback)} attendee(s) with no CRM match "
+                      f"by name+company similarity...", flush=True)
+                fallback_ids, fallback_enrichment = nmls.match_individuals_by_name(needs_fallback, server=nmls_server)
+                matched_count = int((fallback_ids != "").sum())
+                print(f"[matcher] Found {matched_count} of them by name+company.", flush=True)
+                result.table.loc[fallback_ids.index, "NMLS ID Used"] = fallback_ids
+                result.table.loc[fallback_ids[fallback_ids != ""].index, "NMLS Match Method"] = "Name+Company"
+                enrichment = pd.concat([enrichment, fallback_enrichment], ignore_index=True)
+                enrichment = enrichment.drop_duplicates(subset=["IndividualNMLSID"])
+
+            result.table = nmls.merge_nmls_enrichment(result.table, enrichment, mlo_nmls_col="NMLS ID Used")
         except Exception as exc:  # noqa: BLE001 - surface driver/connection errors, don't fail the whole run
             print(f"[matcher] NMLS enrichment failed: {exc}", flush=True)
             result.table["NMLS RegulationType"] = ""
@@ -128,7 +151,8 @@ def run():
     write_excel(result.table, out_path)
     print(f"[matcher] Ready: {out_path}", flush=True)
 
-    nmls_cols = [c for c in ("NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName")
+    nmls_cols = [c for c in ("NMLS Match Method", "NMLS RegulationType", "NMLS LicensingStatus",
+                              "NMLS LocationNMLSID", "NMLS LocationName")
                  if c in result.table.columns]
     preview_cols = list(result.table.columns[:10]) + [c for c in nmls_cols if c not in result.table.columns[:10]]
     preview_rows = safe_str_frame(result.table[preview_cols].head(200)).values.tolist()

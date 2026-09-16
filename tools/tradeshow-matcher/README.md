@@ -73,27 +73,44 @@ Phone/Phone Number, Email/E-mail) are recognized automatically.
 
 ## NMLS enrichment
 
-The "NMLS enrichment" checkbox looks up each matched attendee's `MLO NMLS`
-id (pulled from CRM Contacts/Leads) in a *different* database - the NMLS
-database on `p-nmls-db01.admortgage.com` - and adds three columns:
-`NMLS RegulationType` (State-Licensed / Federally Registered / Dual /
-None), `NMLS LicensingStatus` (Active/Inactive), and `NMLS LocationName`
-(the name of the company or branch that person is currently authorized to
-represent, from `dbo.Company.Name` or `dbo.Branch.Name`).
+The "NMLS enrichment" checkbox looks up each matched attendee in a
+*different* database - the NMLS database on `p-nmls-db01.admortgage.com` -
+and adds `NMLS RegulationType` (State-Licensed / Federally Registered /
+Dual / None), `NMLS LicensingStatus` (Active/Inactive), `NMLS
+LocationNMLSID`, and `NMLS LocationName` (the company or branch that
+person is currently authorized to represent, from `dbo.Company.Name` or
+`dbo.Branch.Name`), plus `NMLS Match Method` saying how each row was
+looked up:
+
+1. **`CRM`** - if the attendee matched a CRM Contact/Lead that has an MLO
+   NMLS id on file, that id is used directly. This is the priority path -
+   it's an exact, unambiguous id, so it always wins when available.
+2. **`Name+Company`** - only for attendees with *no* CRM match at all.
+   Falls back to fuzzy-matching their Full Name against `dbo.Individual`
+   (blocked on exact `LastName`, Jaro-Winkler on First/Last), then - since
+   a name alone can match more than one NMLS individual - uses their
+   Company Name to pick the right one by comparing it against each
+   candidate's resolved company/branch name. If more than one candidate
+   remains and there's no Company Name to disambiguate with (or none of
+   the candidates' companies match well enough), the attendee is left
+   unmatched rather than guessing.
+3. Blank `NMLS Match Method` - neither path found anything (no CRM match
+   and no confident NMLS name match).
 
 Like the CRM pull, this authenticates via Windows Integrated Auth, no
 credentials needed. Unlike a typical bulk NMLS export (which processes the
 *entire* `dbo.Individual` table - hundreds of thousands of rows, meant to
-run offline), this is scoped: it only queries the specific MLO NMLS ids
-that actually matched in this run, via SQL `IN (...)` filters, batched at
-500 ids at a time to stay under SQL Server's parameter limit. See
+run offline), this is scoped: it only queries the specific ids/names that
+are actually relevant to this run, via SQL `IN (...)` filters, batched at
+500 at a time to stay under SQL Server's parameter limit. See
 `matcher/nmls.py` for the full "Authorized to Represent" derivation logic
 (ported from a reporting script, one simplification: it keeps only the
 single most recent authorized location per person, not every one they've
 ever held). Like the CRM query, this has only been exercised against a
-mocked schema (`sample_data/smoke_test_nmls.py`), not a live database -
-verify the `Name` column really exists on both `dbo.Company` and
-`dbo.Branch` in your instance before relying on it.
+mocked schema (`sample_data/smoke_test_nmls.py`,
+`sample_data/smoke_test_nmls_fallback.py`), not a live database - verify
+the `Name` column really exists on both `dbo.Company` and `dbo.Branch` in
+your instance before relying on it.
 
 ## Also used as a backend by the browser extension
 
