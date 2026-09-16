@@ -401,12 +401,18 @@ def match_individuals_by_name(
     server = server or os.environ.get("NMLS_DB_SERVER", "p-nmls-db01.admortgage.com")
     conn_str = _connection_string(server, database)
 
+    upper_last_names = [n.upper() for n in last_names]
     with pyodbc.connect(conn_str) as conn:
         candidates = _read_scoped(
             conn,
+            # UPPER() on both sides rather than a plain "LastName IN (...)":
+            # NMLS-style registry databases sometimes use a case-sensitive
+            # collation, where a plain IN comparison against lowercased
+            # params would silently match nothing even though the name is
+            # really there, just stored differently-cased.
             "SELECT IndividualNMLSID, FirstName, LastName FROM dbo.Individual "
-            "WHERE IsDeleted = 0 AND LastName IN ({placeholders})",
-            last_names,
+            "WHERE IsDeleted = 0 AND UPPER(LastName) IN ({placeholders})",
+            upper_last_names,
         )
         if candidates.empty:
             return empty_ids, pd.DataFrame(columns=ENRICHMENT_COLUMNS)

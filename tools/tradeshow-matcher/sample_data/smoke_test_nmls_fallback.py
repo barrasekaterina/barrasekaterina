@@ -84,7 +84,10 @@ def fake_read_sql(sql, conn, params=None):
             if "InstitutionNMLSID AS CompanyNMLSID" in sql:
                 df = df.rename(columns={"InstitutionNMLSID": "CompanyNMLSID"})
             if params and not df.empty:
-                col = next(c for c in FILTER_COLUMN_CANDIDATES if f"{c} IN (" in sql and c in df.columns)
+                col = next(
+                    c for c in FILTER_COLUMN_CANDIDATES
+                    if (f"{c} IN (" in sql or f"UPPER({c}) IN (" in sql) and c in df.columns
+                )
                 if df[col].dtype == object:
                     param_set = {str(p).lower() for p in params}
                     return df[df[col].astype(str).str.lower().isin(param_set)].reset_index(drop=True)

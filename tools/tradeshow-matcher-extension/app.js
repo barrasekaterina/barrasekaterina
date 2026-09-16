@@ -96,7 +96,6 @@
     const contactsSource = document.querySelector('input[name="crm_contacts_source"]:checked').value;
     const leadsSource = document.querySelector('input[name="crm_leads_source"]:checked').value;
     const backendUrl = document.getElementById("db_backend_url").value.trim();
-    const dbServer = document.getElementById("db_server").value.trim() || undefined;
 
     const runBtn = document.getElementById("run-btn");
     runBtn.disabled = true;
@@ -110,14 +109,14 @@
 
       if (contactsSource === "live") {
         showProgress("Fetching CRM Contacts from the local backend...");
-        crmContactsRows = await DbClient.fetchContactsLive(backendUrl, { server: dbServer });
+        crmContactsRows = await DbClient.fetchContactsLive(backendUrl);
       } else {
         crmContactsFile = document.getElementById("crm_contacts_file").files[0] || null;
       }
 
       if (leadsSource === "live") {
         showProgress("Fetching CRM Leads from the local backend...");
-        crmLeadsRows = await DbClient.fetchLeadsLive(backendUrl, { server: dbServer });
+        crmLeadsRows = await DbClient.fetchLeadsLive(backendUrl);
       } else {
         crmLeadsFile = document.getElementById("crm_leads_file").files[0] || null;
       }
@@ -132,10 +131,9 @@
       });
 
       if (document.getElementById("enrich_nmls").checked) {
-        const nmlsServer = document.getElementById("nmls_server").value.trim() || undefined;
         const mloIds = [...new Set(result.table.map((r) => r["MLO NMLS"]).filter(Boolean))];
         showProgress(`Enriching ${mloIds.length} MLO NMLS id(s) from the local backend...`);
-        const enrichment = await DbClient.fetchNmlsEnrichmentLive(backendUrl, { ids: mloIds, server: nmlsServer });
+        const enrichment = await DbClient.fetchNmlsEnrichmentLive(backendUrl, { ids: mloIds });
         result = Pipeline.mergeNmlsEnrichment(result, enrichment);
       }
       lastResult = result;

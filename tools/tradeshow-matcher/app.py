@@ -63,9 +63,8 @@ def run():
 
     try:
         if request.form.get("crm_contacts_source") == "live":
-            server = request.form.get("db_server") or None
-            print(f"[matcher] Fetching CRM Contacts live from {server or 'default server'}...", flush=True)
-            raw = db.fetch_contacts(server=server)
+            print("[matcher] Fetching CRM Contacts live...", flush=True)
+            raw = db.fetch_contacts()
             print(f"[matcher] Got {len(raw)} contact rows, standardizing...", flush=True)
             crm_contacts_df = loaders.standardize_db_contacts(raw)
         else:
@@ -74,9 +73,8 @@ def run():
                 crm_contacts_file = io.BytesIO(uploaded.read())
 
         if request.form.get("crm_leads_source") == "live":
-            server = request.form.get("db_server") or None
-            print(f"[matcher] Fetching CRM Leads live from {server or 'default server'}...", flush=True)
-            raw = db.fetch_leads(server=server)
+            print("[matcher] Fetching CRM Leads live...", flush=True)
+            raw = db.fetch_leads()
             print(f"[matcher] Got {len(raw)} lead rows, standardizing...", flush=True)
             crm_leads_df = loaders.standardize_db_leads(raw)
         else:
@@ -109,7 +107,6 @@ def run():
     )
 
     if request.form.get("enrich_nmls") == "on":
-        nmls_server = request.form.get("nmls_server") or None
         # Priority: if an attendee matched a CRM Contact/Lead, use that
         # record's MLO NMLS id directly - it's a known, unambiguous id.
         # Only for attendees with no CRM match at all do we fall back to
@@ -118,9 +115,8 @@ def run():
         result.table["NMLS Match Method"] = result.table["NMLS ID Used"].apply(lambda v: "CRM" if v else "")
         try:
             crm_ids = [i for i in result.table["NMLS ID Used"] if i]
-            print(f"[matcher] Enriching {len(crm_ids)} MLO NMLS id(s) from CRM matches, "
-                  f"from {nmls_server or 'default NMLS server'}...", flush=True)
-            enrichment = nmls.fetch_nmls_enrichment(crm_ids, server=nmls_server)
+            print(f"[matcher] Enriching {len(crm_ids)} MLO NMLS id(s) from CRM matches...", flush=True)
+            enrichment = nmls.fetch_nmls_enrichment(crm_ids)
             print(f"[matcher] NMLS returned {len(enrichment)} matched individual(s) via CRM.", flush=True)
 
             needs_fallback = result.table.loc[
@@ -129,7 +125,7 @@ def run():
             if not needs_fallback.empty:
                 print(f"[matcher] Looking up {len(needs_fallback)} attendee(s) with no CRM match "
                       f"by name+company similarity...", flush=True)
-                fallback_ids, fallback_enrichment = nmls.match_individuals_by_name(needs_fallback, server=nmls_server)
+                fallback_ids, fallback_enrichment = nmls.match_individuals_by_name(needs_fallback)
                 matched_count = int((fallback_ids != "").sum())
                 print(f"[matcher] Found {matched_count} of them by name+company.", flush=True)
                 result.table.loc[fallback_ids.index, "NMLS ID Used"] = fallback_ids
@@ -172,11 +168,9 @@ def api_contacts():
     if request.method == "OPTIONS":
         return "", 204
 
-    payload = request.get_json(silent=True) or {}
-    server = payload.get("server") or None
-    print(f"[matcher] (extension) Fetching CRM Contacts live from {server or 'default server'}...", flush=True)
+    print("[matcher] (extension) Fetching CRM Contacts live...", flush=True)
     try:
-        raw = db.fetch_contacts(server=server)
+        raw = db.fetch_contacts()
         print(f"[matcher] (extension) Got {len(raw)} contact rows.", flush=True)
         standardized = loaders.standardize_db_contacts(raw)
     except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
@@ -190,11 +184,9 @@ def api_leads():
     if request.method == "OPTIONS":
         return "", 204
 
-    payload = request.get_json(silent=True) or {}
-    server = payload.get("server") or None
-    print(f"[matcher] (extension) Fetching CRM Leads live from {server or 'default server'}...", flush=True)
+    print("[matcher] (extension) Fetching CRM Leads live...", flush=True)
     try:
-        raw = db.fetch_leads(server=server)
+        raw = db.fetch_leads()
         print(f"[matcher] (extension) Got {len(raw)} lead rows.", flush=True)
         standardized = loaders.standardize_db_leads(raw)
     except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
@@ -210,10 +202,9 @@ def api_nmls():
 
     payload = request.get_json(silent=True) or {}
     ids = payload.get("ids") or []
-    server = payload.get("server") or None
-    print(f"[matcher] (extension) Enriching {len(ids)} MLO NMLS id(s) from {server or 'default NMLS server'}...", flush=True)
+    print(f"[matcher] (extension) Enriching {len(ids)} MLO NMLS id(s)...", flush=True)
     try:
-        enrichment = nmls.fetch_nmls_enrichment(ids, server=server)
+        enrichment = nmls.fetch_nmls_enrichment(ids)
         print(f"[matcher] (extension) NMLS returned {len(enrichment)} matched individual(s).", flush=True)
     except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
         print(f"[matcher] (extension) NMLS enrichment failed: {exc}", flush=True)

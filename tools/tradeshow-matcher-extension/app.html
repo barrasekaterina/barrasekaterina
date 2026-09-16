@@ -60,13 +60,10 @@
           Look up each matched MLO's NMLS record and add their currently
           Authorized-to-Represent company/branch name
         </label>
-        <label>
-          <span>NMLS DB server <em>(optional, defaults to p-nmls-db01.admortgage.com)</em></span>
-          <input type="text" id="nmls_server" placeholder="p-nmls-db01.admortgage.com">
-        </label>
         <p class="note">
-          Also goes through the local backend below &mdash; only looks up
-          MLO NMLS ids that actually matched in this run.
+          Connects to <code>p-nmls-db01.admortgage.com</code> via the local
+          backend below &mdash; only looks up MLO NMLS ids that actually
+          matched in this run.
         </p>
       </fieldset>
 
@@ -75,14 +72,10 @@
           <span>Local backend URL</span>
           <input type="text" id="db_backend_url" value="http://127.0.0.1:5050">
         </label>
-        <label>
-          <span>CRM DB server <em>(optional, defaults to bi-02.prod.admortgage.com)</em></span>
-          <input type="text" id="db_server" placeholder="bi-02.prod.admortgage.com">
-        </label>
         <p class="note">
-          No username/password needed &mdash; everything here authenticates
-          via Windows Integrated Auth, using whichever account the local
-          backend is running as.
+          Connects to <code>bi-02.prod.admortgage.com</code> via Windows
+          Integrated Auth &mdash; no username/password needed, and not
+          editable here on purpose.
         </p>
       </div>
 

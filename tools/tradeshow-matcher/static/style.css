@@ -103,6 +103,13 @@ label.radio input { width: auto; margin: 0; }
   font-size: 0.85rem;
 }
 
+.note code {
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+
 button:disabled { opacity: 0.6; cursor: default; }
 
 .progress {

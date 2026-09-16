@@ -60,14 +60,10 @@
       </fieldset>
 
       <div id="db-fields" style="display:none">
-        <label>
-          <span>CRM DB server <em>(optional, defaults to bi-02.prod.admortgage.com)</em></span>
-          <input type="text" name="db_server" placeholder="bi-02.prod.admortgage.com">
-        </label>
         <p class="note">
-          No username/password needed &mdash; both Contacts and Leads
-          authenticate via Windows Integrated Auth, using whichever account
-          this server is running as.
+          Connects to <code>bi-02.prod.admortgage.com</code> via Windows
+          Integrated Auth &mdash; no username/password needed, and not
+          editable here on purpose.
         </p>
       </div>
 
@@ -78,14 +74,11 @@
           Look up each matched MLO's NMLS record and add their currently
           Authorized-to-Represent company/branch name
         </label>
-        <label>
-          <span>NMLS DB server <em>(optional, defaults to p-nmls-db01.admortgage.com)</em></span>
-          <input type="text" name="nmls_server" placeholder="p-nmls-db01.admortgage.com">
-        </label>
         <p class="note">
-          Uses Windows Integrated Auth, same as CRM &mdash; no credentials
-          needed. Only looks up MLO NMLS ids that actually matched in this
-          run, not the whole NMLS database.
+          Connects to <code>p-nmls-db01.admortgage.com</code> via Windows
+          Integrated Auth, same as CRM &mdash; no credentials needed. Only
+          looks up MLO NMLS ids that actually matched in this run, not the
+          whole NMLS database.
         </p>
       </fieldset>
 

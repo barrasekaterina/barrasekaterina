@@ -29,16 +29,16 @@
     return data.rows || [];
   }
 
-  async function fetchContactsLive(backendUrl, { server }) {
-    return postJson(`${backendUrl.replace(/\/$/, "")}/api/contacts`, { server });
+  async function fetchContactsLive(backendUrl) {
+    return postJson(`${backendUrl.replace(/\/$/, "")}/api/contacts`, {});
   }
 
-  async function fetchLeadsLive(backendUrl, { server }) {
-    return postJson(`${backendUrl.replace(/\/$/, "")}/api/leads`, { server });
+  async function fetchLeadsLive(backendUrl) {
+    return postJson(`${backendUrl.replace(/\/$/, "")}/api/leads`, {});
   }
 
-  async function fetchNmlsEnrichmentLive(backendUrl, { ids, server }) {
-    return postJson(`${backendUrl.replace(/\/$/, "")}/api/nmls`, { ids, server });
+  async function fetchNmlsEnrichmentLive(backendUrl, { ids }) {
+    return postJson(`${backendUrl.replace(/\/$/, "")}/api/nmls`, { ids });
   }
 
   global.DbClient = { fetchContactsLive, fetchLeadsLive, fetchNmlsEnrichmentLive };
