@@ -79,6 +79,7 @@
         isLeadMatch: !!lm,
         "Contact CRM ID": cm ? cm.crm.ID || "" : "",
         "Lead CRM ID": lm ? lm.crm.ID || "" : "",
+        "MLO NMLS": (cm && cm.crm.MLO_NMLS) || (lm && lm.crm.MLO_NMLS) || "",
       };
     });
 
@@ -91,12 +92,17 @@
       ...row,
       "Contact CRM Link": row["Contact CRM ID"] ? CRM_CONTACT_URL.replace("{id}", row["Contact CRM ID"]) : "",
       "Lead CRM Link": row["Lead CRM ID"] ? CRM_LEAD_URL.replace("{id}", row["Lead CRM ID"]) : "",
+      "Found in Contacts": row.isContactMatch ? "Yes" : "No",
+      "Found in Leads": row.isLeadMatch ? "Yes" : "No",
+      "Found in CRM": row.isContactMatch || row.isLeadMatch ? "Yes" : "No",
     }));
 
     const displayCols = [
-      "Status", "Full Name", "Company Name", "Phone", "Email", "Job Title",
+      "Status", "Found in CRM", "Found in Contacts", "Found in Leads",
+      "Full Name", "Company Name", "Phone", "Email", "Job Title",
       "Job_Category", "Banks and Credit Unions", "Duplicate", "New Contact",
-      "Contact CRM Link", "Lead CRM Link",
+      "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
+      "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationName",
     ].filter((c) => c in (result[0] || {}));
 
     const summary = {
@@ -111,5 +117,26 @@
     return { detectedFields, table: result, displayCols, summary };
   }
 
-  global.Pipeline = { runPipeline };
+  // Left-join NMLS enrichment rows (from DbClient.fetchNmlsEnrichmentLive)
+  // onto a pipeline result by MLO NMLS id. Mirrors matcher.nmls's Python
+  // equivalent. Returns an updated {table, displayCols}.
+  function mergeNmlsEnrichment(pipelineResult, enrichmentRows) {
+    const byId = new Map(enrichmentRows.map((r) => [String(r.IndividualNMLSID), r]));
+    const table = pipelineResult.table.map((row) => {
+      const match = byId.get(String(row["MLO NMLS"] || ""));
+      return {
+        ...row,
+        "NMLS RegulationType": match ? match.RegulationType || "" : "",
+        "NMLS LicensingStatus": match ? match.LicensingStatus || "" : "",
+        "NMLS LocationName": match ? match.LocationName || "" : "",
+      };
+    });
+    const displayCols = [...pipelineResult.displayCols];
+    ["NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationName"].forEach((c) => {
+      if (!displayCols.includes(c)) displayCols.push(c);
+    });
+    return { ...pipelineResult, table, displayCols };
+  }
+
+  global.Pipeline = { runPipeline, mergeNmlsEnrichment };
 })(typeof window !== "undefined" ? window : globalThis);

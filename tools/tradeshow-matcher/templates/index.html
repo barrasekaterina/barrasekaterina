@@ -71,6 +71,24 @@
         </p>
       </div>
 
+      <fieldset>
+        <legend>NMLS enrichment <em>(optional)</em></legend>
+        <label class="radio">
+          <input type="checkbox" name="enrich_nmls">
+          Look up each matched MLO's NMLS record and add their currently
+          Authorized-to-Represent company/branch name
+        </label>
+        <label>
+          <span>NMLS DB server <em>(optional, defaults to p-nmls-db01.admortgage.com)</em></span>
+          <input type="text" name="nmls_server" placeholder="p-nmls-db01.admortgage.com">
+        </label>
+        <p class="note">
+          Uses Windows Integrated Auth, same as CRM &mdash; no credentials
+          needed. Only looks up MLO NMLS ids that actually matched in this
+          run, not the whole NMLS database.
+        </p>
+      </fieldset>
+
       <button type="submit" id="run-btn">Run matching</button>
       <p id="progress" class="progress" hidden>
         <span class="spinner"></span>

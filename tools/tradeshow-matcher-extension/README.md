@@ -41,6 +41,16 @@ needs credentials at all; an open CORS policy would let any website you
 happen to have open in another tab silently query your CRM data while the
 server runs.
 
+## NMLS enrichment
+
+The "NMLS enrichment" checkbox works the same way — it calls the Flask
+backend's `/api/nmls` endpoint with the MLO NMLS ids that matched in this
+run, and merges back `NMLS RegulationType`, `NMLS LicensingStatus`, and
+`NMLS LocationName` (the company/branch that person is currently
+authorized to represent). Same backend, same Windows Integrated Auth, same
+"only queries what actually matched" scoping — see the Flask README's
+"NMLS enrichment" section for the full details and caveats.
+
 ## What's different from the Python/Flask version
 
 - **Excel export has no color-coded Status column.** The vendored
@@ -64,9 +74,9 @@ server runs.
 - `js/cleaning.js`, `js/loaders.js`, `js/matching.js`, `js/enrich.js`,
   `js/pipeline.js`, `js/export.js` — ported matching engine, one module per
   concern, mirroring `tools/tradeshow-matcher/matcher/*.py`.
-- `js/db.js` — client for the local Flask backend's `/api/contacts` /
-  `/api/leads` endpoints, used only by the "Pull live via local backend"
-  option.
+- `js/db.js` — client for the local Flask backend's `/api/contacts`,
+  `/api/leads`, and `/api/nmls` endpoints, used by the "Pull live via local
+  backend" and "NMLS enrichment" options.
 - `lib/xlsx.full.min.js` — vendored SheetJS (Apache-2.0), used to parse
   uploaded `.csv`/`.xlsx` files and to build the downloadable export.
 

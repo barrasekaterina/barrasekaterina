@@ -31,7 +31,10 @@
   }
 
   function renderPreview(table, displayCols) {
-    const cols = Export.orderedColumns(displayCols, table).slice(0, 10);
+    const ordered = Export.orderedColumns(displayCols, table);
+    const first10 = ordered.slice(0, 10);
+    const nmlsCols = ordered.filter((c) => c.startsWith("NMLS ") && !first10.includes(c));
+    const cols = [...first10, ...nmlsCols];
     const head = document.getElementById("preview-head");
     head.innerHTML = cols.map((c) => `<th>${escapeHtml(c)}</th>`).join("");
 
@@ -63,7 +66,8 @@
   function anyLiveSourceSelected() {
     return (
       document.querySelector('input[name="crm_contacts_source"]:checked').value === "live" ||
-      document.querySelector('input[name="crm_leads_source"]:checked').value === "live"
+      document.querySelector('input[name="crm_leads_source"]:checked').value === "live" ||
+      document.getElementById("enrich_nmls").checked
     );
   }
   function refreshSourceVisibility() {
@@ -76,6 +80,7 @@
   document.querySelectorAll('input[name="crm_contacts_source"], input[name="crm_leads_source"]').forEach((el) => {
     el.addEventListener("change", refreshSourceVisibility);
   });
+  document.getElementById("enrich_nmls").addEventListener("change", refreshSourceVisibility);
   refreshSourceVisibility();
 
   form.addEventListener("submit", async (event) => {
@@ -117,7 +122,7 @@
         crmLeadsFile = document.getElementById("crm_leads_file").files[0] || null;
       }
 
-      const result = await Pipeline.runPipeline({
+      let result = await Pipeline.runPipeline({
         tradeshowFile,
         crmContactsFile,
         crmLeadsFile,
@@ -125,6 +130,14 @@
         crmLeadsRows,
         onProgress: showProgress,
       });
+
+      if (document.getElementById("enrich_nmls").checked) {
+        const nmlsServer = document.getElementById("nmls_server").value.trim() || undefined;
+        const mloIds = [...new Set(result.table.map((r) => r["MLO NMLS"]).filter(Boolean))];
+        showProgress(`Enriching ${mloIds.length} MLO NMLS id(s) from the local backend...`);
+        const enrichment = await DbClient.fetchNmlsEnrichmentLive(backendUrl, { ids: mloIds, server: nmlsServer });
+        result = Pipeline.mergeNmlsEnrichment(result, enrichment);
+      }
       lastResult = result;
 
       document.getElementById("detected-fields").textContent = result.detectedFields.length

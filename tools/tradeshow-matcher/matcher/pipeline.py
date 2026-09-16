@@ -83,6 +83,7 @@ def run_pipeline(
     result["is_lead_match"] = False
     result["Contact CRM ID"] = ""
     result["Lead CRM ID"] = ""
+    result["MLO NMLS"] = ""
 
     if agg_contacts is not None and not agg_contacts.empty:
         key = "Full Name_tradeshow"
@@ -95,6 +96,9 @@ def run_pipeline(
         if "ID" in agg_contacts.columns:
             id_map = dict(zip(agg_contacts[key], agg_contacts["ID"]))
             result["Contact CRM ID"] = cleaning.safe_str_series(result["Full Name"].map(id_map))
+        if "MLO_NMLS" in agg_contacts.columns:
+            nmls_map = dict(zip(agg_contacts[key], agg_contacts["MLO_NMLS"]))
+            result["MLO NMLS"] = cleaning.safe_str_series(result["Full Name"].map(nmls_map))
 
     if agg_leads is not None and not agg_leads.empty:
         key = "Full Name_tradeshow"
@@ -103,6 +107,12 @@ def run_pipeline(
         if "ID" in agg_leads.columns:
             id_map = dict(zip(agg_leads[key], agg_leads["ID"]))
             result["Lead CRM ID"] = cleaning.safe_str_series(result["Full Name"].map(id_map))
+        if "MLO_NMLS" in agg_leads.columns:
+            # Contacts' MLO NMLS wins if a row somehow matched both; only
+            # fill in the lead's value where we don't already have one.
+            nmls_map = dict(zip(agg_leads[key], agg_leads["MLO_NMLS"]))
+            lead_nmls = cleaning.safe_str_series(result["Full Name"].map(nmls_map))
+            result["MLO NMLS"] = result["MLO NMLS"].where(result["MLO NMLS"] != "", lead_nmls)
 
     crm_domains = enrich.crm_email_domains(crm_contacts) if crm_contacts is not None else set()
     result = enrich.enrich_and_score_status(
@@ -119,10 +129,17 @@ def run_pipeline(
         lambda i: CRM_LEAD_URL.format(id=i) if i else ""
     )
 
+    result["Found in Contacts"] = result["is_contact_match"].map({True: "Yes", False: "No"})
+    result["Found in Leads"] = result["is_lead_match"].map({True: "Yes", False: "No"})
+    result["Found in CRM"] = (result["is_contact_match"] | result["is_lead_match"]).map(
+        {True: "Yes", False: "No"}
+    )
+
     display_cols = [
-        "Status", "Full Name", "Company Name", "Phone", "Email", "Job Title",
+        "Status", "Found in CRM", "Found in Contacts", "Found in Leads",
+        "Full Name", "Company Name", "Phone", "Email", "Job Title",
         "Job_Category", "Banks and Credit Unions", "Duplicate", "New Contact",
-        "Contact CRM Link", "Lead CRM Link",
+        "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
     ]
     display_cols = [c for c in display_cols if c in result.columns]
     other_cols = [c for c in result.columns if c not in display_cols]

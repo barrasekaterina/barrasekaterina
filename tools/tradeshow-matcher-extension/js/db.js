@@ -1,10 +1,10 @@
-// Client for the local Flask backend's /api/contacts and /api/leads
-// endpoints (tools/tradeshow-matcher/app.py). This exists because a
-// browser extension cannot open a direct SQL Server connection itself -
+// Client for the local Flask backend's /api/contacts, /api/leads, and
+// /api/nmls endpoints (tools/tradeshow-matcher/app.py). This exists because
+// a browser extension cannot open a direct SQL Server connection itself -
 // the actual pyodbc connection happens in that local backend, which must
-// be running on this machine. Both endpoints authenticate via Windows
-// Integrated Auth server-side, so no credentials are collected or sent
-// from here at all.
+// be running on this machine. All three endpoints authenticate via
+// Windows Integrated Auth server-side, so no credentials are collected or
+// sent from here at all.
 (function (global) {
   "use strict";
 
@@ -37,5 +37,9 @@
     return postJson(`${backendUrl.replace(/\/$/, "")}/api/leads`, { server });
   }
 
-  global.DbClient = { fetchContactsLive, fetchLeadsLive };
+  async function fetchNmlsEnrichmentLive(backendUrl, { ids, server }) {
+    return postJson(`${backendUrl.replace(/\/$/, "")}/api/nmls`, { ids, server });
+  }
+
+  global.DbClient = { fetchContactsLive, fetchLeadsLive, fetchNmlsEnrichmentLive };
 })(typeof window !== "undefined" ? window : globalThis);

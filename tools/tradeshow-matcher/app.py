@@ -14,7 +14,7 @@ import uuid
 
 from flask import Flask, jsonify, render_template, request, send_file
 
-from matcher import db, loaders
+from matcher import db, loaders, nmls
 from matcher.cleaning import safe_str_frame
 from matcher.pipeline import run_pipeline, write_excel
 
@@ -103,15 +103,33 @@ def run():
     print(
         f"[matcher] Done: {result.summary['total_attendees']} attendees, "
         f"{result.summary['matched_contacts']} matched contacts, "
-        f"{result.summary['matched_leads']} matched leads. Writing Excel...",
+        f"{result.summary['matched_leads']} matched leads.",
         flush=True,
     )
+
+    if request.form.get("enrich_nmls") == "on":
+        nmls_server = request.form.get("nmls_server") or None
+        mlo_ids = [i for i in result.table.get("MLO NMLS", []) if i]
+        print(f"[matcher] Enriching {len(mlo_ids)} MLO NMLS id(s) from {nmls_server or 'default NMLS server'}...", flush=True)
+        try:
+            enrichment = nmls.fetch_nmls_enrichment(mlo_ids, server=nmls_server)
+            print(f"[matcher] NMLS returned {len(enrichment)} matched individual(s).", flush=True)
+            result.table = nmls.merge_nmls_enrichment(result.table, enrichment)
+        except Exception as exc:  # noqa: BLE001 - surface driver/connection errors, don't fail the whole run
+            print(f"[matcher] NMLS enrichment failed: {exc}", flush=True)
+            result.table["NMLS RegulationType"] = ""
+            result.table["NMLS LicensingStatus"] = ""
+            result.table["NMLS LocationName"] = ""
+
+    print("[matcher] Writing Excel...", flush=True)
     token = uuid.uuid4().hex
     out_path = os.path.join(RESULTS_DIR, f"{token}.xlsx")
     write_excel(result.table, out_path)
     print(f"[matcher] Ready: {out_path}", flush=True)
 
-    preview_cols = list(result.table.columns[:10])
+    nmls_cols = [c for c in ("NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationName")
+                 if c in result.table.columns]
+    preview_cols = list(result.table.columns[:10]) + [c for c in nmls_cols if c not in result.table.columns[:10]]
     preview_rows = safe_str_frame(result.table[preview_cols].head(200)).values.tolist()
 
     return render_template(
@@ -158,6 +176,24 @@ def api_leads():
         print(f"[matcher] (extension) Leads fetch failed: {exc}", flush=True)
         return jsonify(error=str(exc)), 500
     return jsonify(rows=safe_str_frame(standardized).to_dict(orient="records"))
+
+
+@app.route("/api/nmls", methods=["POST", "OPTIONS"])
+def api_nmls():
+    if request.method == "OPTIONS":
+        return "", 204
+
+    payload = request.get_json(silent=True) or {}
+    ids = payload.get("ids") or []
+    server = payload.get("server") or None
+    print(f"[matcher] (extension) Enriching {len(ids)} MLO NMLS id(s) from {server or 'default NMLS server'}...", flush=True)
+    try:
+        enrichment = nmls.fetch_nmls_enrichment(ids, server=server)
+        print(f"[matcher] (extension) NMLS returned {len(enrichment)} matched individual(s).", flush=True)
+    except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
+        print(f"[matcher] (extension) NMLS enrichment failed: {exc}", flush=True)
+        return jsonify(error=str(exc)), 500
+    return jsonify(rows=safe_str_frame(enrichment).to_dict(orient="records"))
 
 
 @app.route("/download/<token>")

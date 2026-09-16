@@ -25,7 +25,10 @@ entirely.
 3. Flags each attendee as an existing **Contact**, existing **Lead**,
    **Duplicate**, **New Contact**, or **personal_email**, and buckets job
    titles (Owner/CEO, Loan Officer, Account Executive, ...).
-4. Produces a color-coded Excel export with clickable links back to the CRM
+4. Optionally looks up each matched attendee's MLO NMLS id in the NMLS
+   database and adds their currently Authorized-to-Represent company or
+   branch name (see "NMLS enrichment" below).
+5. Produces a color-coded Excel export with clickable links back to the CRM
    record, plus an in-browser preview.
 
 ## Running it
@@ -68,16 +71,41 @@ The tradeshow file can be `.csv` or `.xlsx` and just needs a name column —
 common header spellings (Name, Full Name, Company/Organization,
 Phone/Phone Number, Email/E-mail) are recognized automatically.
 
+## NMLS enrichment
+
+The "NMLS enrichment" checkbox looks up each matched attendee's `MLO NMLS`
+id (pulled from CRM Contacts/Leads) in a *different* database - the NMLS
+database on `p-nmls-db01.admortgage.com` - and adds three columns:
+`NMLS RegulationType` (State-Licensed / Federally Registered / Dual /
+None), `NMLS LicensingStatus` (Active/Inactive), and `NMLS LocationName`
+(the name of the company or branch that person is currently authorized to
+represent, from `dbo.Company.Name` or `dbo.Branch.Name`).
+
+Like the CRM pull, this authenticates via Windows Integrated Auth, no
+credentials needed. Unlike a typical bulk NMLS export (which processes the
+*entire* `dbo.Individual` table - hundreds of thousands of rows, meant to
+run offline), this is scoped: it only queries the specific MLO NMLS ids
+that actually matched in this run, via SQL `IN (...)` filters, batched at
+500 ids at a time to stay under SQL Server's parameter limit. See
+`matcher/nmls.py` for the full "Authorized to Represent" derivation logic
+(ported from a reporting script, one simplification: it keeps only the
+single most recent authorized location per person, not every one they've
+ever held). Like the CRM query, this has only been exercised against a
+mocked schema (`sample_data/smoke_test_nmls.py`), not a live database -
+verify the `Name` column really exists on both `dbo.Company` and
+`dbo.Branch` in your instance before relying on it.
+
 ## Also used as a backend by the browser extension
 
 `tools/tradeshow-matcher-extension/` is a Chrome/Edge extension version of
 this same tool. It runs entirely client-side, but a browser can't open a
-direct SQL Server connection, so its "Pull live via local backend" option
-calls this Flask app's `/api/contacts` and `/api/leads` JSON endpoints
-instead, which do the real `pyodbc` call and return standardized rows. Keep
-`python app.py` running here if you want to use that option from the
-extension. CORS on those two routes is restricted to `chrome-extension://`
-origins only (see `app.py`) — never widen that to `*`.
+direct SQL Server connection, so its "Pull live via local backend" and
+"NMLS enrichment" options call this Flask app's `/api/contacts`,
+`/api/leads`, and `/api/nmls` JSON endpoints instead, which do the real
+`pyodbc` calls and return standardized rows. Keep `python app.py` running
+here if you want to use those options from the extension. CORS on those
+routes is restricted to `chrome-extension://` origins only (see `app.py`)
+— never widen that to `*`.
 
 ## Sample data
 

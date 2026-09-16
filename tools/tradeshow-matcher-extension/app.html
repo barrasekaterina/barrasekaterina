@@ -53,6 +53,23 @@
         </div>
       </fieldset>
 
+      <fieldset>
+        <legend>NMLS enrichment <em>(optional)</em></legend>
+        <label class="radio">
+          <input type="checkbox" id="enrich_nmls">
+          Look up each matched MLO's NMLS record and add their currently
+          Authorized-to-Represent company/branch name
+        </label>
+        <label>
+          <span>NMLS DB server <em>(optional, defaults to p-nmls-db01.admortgage.com)</em></span>
+          <input type="text" id="nmls_server" placeholder="p-nmls-db01.admortgage.com">
+        </label>
+        <p class="note">
+          Also goes through the local backend below &mdash; only looks up
+          MLO NMLS ids that actually matched in this run.
+        </p>
+      </fieldset>
+
       <div id="db-fields" hidden>
         <label>
           <span>Local backend URL</span>
@@ -63,9 +80,9 @@
           <input type="text" id="db_server" placeholder="bi-02.prod.admortgage.com">
         </label>
         <p class="note">
-          No username/password needed &mdash; both Contacts and Leads
-          authenticate via Windows Integrated Auth, using whichever account
-          the local backend is running as.
+          No username/password needed &mdash; everything here authenticates
+          via Windows Integrated Auth, using whichever account the local
+          backend is running as.
         </p>
       </div>
 
