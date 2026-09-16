@@ -359,7 +359,7 @@ def merge_nmls_enrichment(table: pd.DataFrame, enrichment: pd.DataFrame, mlo_nml
     blank enrichment columns rather than being dropped."""
     if mlo_nmls_col not in table.columns or enrichment.empty:
         out = table.copy()
-        for col in ("RegulationType", "LicensingStatus", "LocationName"):
+        for col in ("RegulationType", "LicensingStatus", "LocationNMLSID", "LocationName"):
             out[f"NMLS {col}"] = ""
         return out
 
@@ -369,5 +369,6 @@ def merge_nmls_enrichment(table: pd.DataFrame, enrichment: pd.DataFrame, mlo_nml
     out = table.copy()
     out["NMLS RegulationType"] = ids.map(lookup["RegulationType"]).fillna("") if "RegulationType" in lookup else ""
     out["NMLS LicensingStatus"] = ids.map(lookup["LicensingStatus"]).fillna("") if "LicensingStatus" in lookup else ""
+    out["NMLS LocationNMLSID"] = ids.map(lookup["LocationNMLSID"]).fillna("") if "LocationNMLSID" in lookup else ""
     out["NMLS LocationName"] = ids.map(lookup["LocationName"]).fillna("") if "LocationName" in lookup else ""
     return out

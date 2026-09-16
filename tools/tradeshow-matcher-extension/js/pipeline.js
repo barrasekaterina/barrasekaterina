@@ -102,7 +102,7 @@
       "Full Name", "Company Name", "Phone", "Email", "Job Title",
       "Job_Category", "Banks and Credit Unions", "Duplicate", "New Contact",
       "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
-      "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationName",
+      "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName",
     ].filter((c) => c in (result[0] || {}));
 
     const summary = {
@@ -128,11 +128,12 @@
         ...row,
         "NMLS RegulationType": match ? match.RegulationType || "" : "",
         "NMLS LicensingStatus": match ? match.LicensingStatus || "" : "",
+        "NMLS LocationNMLSID": match ? match.LocationNMLSID || "" : "",
         "NMLS LocationName": match ? match.LocationName || "" : "",
       };
     });
     const displayCols = [...pipelineResult.displayCols];
-    ["NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationName"].forEach((c) => {
+    ["NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName"].forEach((c) => {
       if (!displayCols.includes(c)) displayCols.push(c);
     });
     return { ...pipelineResult, table, displayCols };

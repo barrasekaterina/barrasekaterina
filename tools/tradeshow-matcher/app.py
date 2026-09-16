@@ -119,6 +119,7 @@ def run():
             print(f"[matcher] NMLS enrichment failed: {exc}", flush=True)
             result.table["NMLS RegulationType"] = ""
             result.table["NMLS LicensingStatus"] = ""
+            result.table["NMLS LocationNMLSID"] = ""
             result.table["NMLS LocationName"] = ""
 
     print("[matcher] Writing Excel...", flush=True)
@@ -127,7 +128,7 @@ def run():
     write_excel(result.table, out_path)
     print(f"[matcher] Ready: {out_path}", flush=True)
 
-    nmls_cols = [c for c in ("NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationName")
+    nmls_cols = [c for c in ("NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName")
                  if c in result.table.columns]
     preview_cols = list(result.table.columns[:10]) + [c for c in nmls_cols if c not in result.table.columns[:10]]
     preview_rows = safe_str_frame(result.table[preview_cols].head(200)).values.tolist()

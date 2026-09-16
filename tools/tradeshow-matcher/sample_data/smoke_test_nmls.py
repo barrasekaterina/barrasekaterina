@@ -144,5 +144,8 @@ print("\n", merged.to_string())
 assert merged.loc[0, "NMLS LocationName"] == "Acme Lending"
 assert merged.loc[1, "NMLS LocationName"] == "Downtown Branch"
 assert merged.loc[2, "NMLS LocationName"] == ""
+assert merged.loc[0, "NMLS LocationNMLSID"] == "1111"
+assert merged.loc[1, "NMLS LocationNMLSID"] == "2222"
+assert merged.loc[2, "NMLS LocationNMLSID"] == ""
 
 print("\nALL NMLS TESTS PASSED")
