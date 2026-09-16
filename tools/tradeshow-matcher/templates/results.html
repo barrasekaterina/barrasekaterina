@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Match Results</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="card wide">
+    <h1>Match Results</h1>
+
+    <p class="subtitle">
+      Detected fields on your tradeshow file:
+      <strong>Full Name</strong>{% for f in detected_fields %}, <strong>{{ f }}</strong>{% endfor %}.
+    </p>
+
+    <div class="summary">
+      <div><span>{{ summary.total_attendees }}</span>Attendees</div>
+      <div><span>{{ summary.matched_contacts }}</span>Matched Contacts</div>
+      <div><span>{{ summary.matched_leads }}</span>Matched Leads</div>
+      <div><span>{{ summary.duplicates }}</span>Duplicates</div>
+      <div><span>{{ summary.new_contacts }}</span>New Contacts</div>
+      <div><span>{{ summary.personal_emails }}</span>Personal Emails</div>
+    </div>
+
+    <a class="button" href="{{ url_for('download', token=download_token) }}">Download full Excel</a>
+    <a class="button secondary" href="{{ url_for('index') }}">Run another file</a>
+
+    <h2>Preview (first 200 rows)</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>{% for col in preview_cols %}<th>{{ col }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+          {% for row in preview_rows %}
+          <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>

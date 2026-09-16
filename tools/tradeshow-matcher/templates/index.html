@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tradeshow vs CRM Matcher</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="card">
+    <h1>Tradeshow vs CRM Matcher</h1>
+    <p class="subtitle">
+      Upload a tradeshow attendee list plus your CRM exports. The tool
+      auto-detects whether your list has Full Name + Email, + Company Name,
+      + Phone, or all of them, and matches accordingly &mdash; no business
+      cards involved.
+    </p>
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form action="{{ url_for('run') }}" method="post" enctype="multipart/form-data">
+      <label>
+        <span>Tradeshow attendee list <em>(required, .csv or .xlsx)</em></span>
+        <input type="file" name="tradeshow_file" accept=".csv,.xlsx,.xls" required>
+      </label>
+
+      <fieldset>
+        <legend>CRM Contacts <em>(optional)</em></legend>
+        <label class="radio">
+          <input type="radio" name="crm_contacts_source" value="upload" checked
+                 onchange="document.getElementById('contacts-upload').style.display='block'; document.getElementById('db-fields').style.display='none';">
+          Upload CSV export (semicolon-separated)
+        </label>
+        <label class="radio">
+          <input type="radio" name="crm_contacts_source" value="live"
+                 onchange="document.getElementById('contacts-upload').style.display='none'; document.getElementById('db-fields').style.display='block';">
+          Pull live from CRM database
+        </label>
+        <div id="contacts-upload">
+          <input type="file" name="crm_contacts_file" accept=".csv">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>CRM Leads <em>(optional)</em></legend>
+        <label class="radio">
+          <input type="radio" name="crm_leads_source" value="upload" checked
+                 onchange="document.getElementById('leads-upload').style.display='block';">
+          Upload CSV export (semicolon-separated)
+        </label>
+        <label class="radio">
+          <input type="radio" name="crm_leads_source" value="live"
+                 onchange="document.getElementById('leads-upload').style.display='none'; document.getElementById('db-fields').style.display='block';">
+          Pull live from CRM database (Windows Integrated Auth)
+        </label>
+        <div id="leads-upload">
+          <input type="file" name="crm_leads_file" accept=".csv">
+        </div>
+      </fieldset>
+
+      <div id="db-fields" style="display:none">
+        <label>
+          <span>CRM DB server <em>(optional, defaults to bi-02.prod.admortgage.com)</em></span>
+          <input type="text" name="db_server" placeholder="bi-02.prod.admortgage.com">
+        </label>
+        <label>
+          <span>DB username <em>(only needed for Contacts; leave blank to use the server's CRM_DB_USER)</em></span>
+          <input type="text" name="db_uid" autocomplete="off">
+        </label>
+        <label>
+          <span>DB password <em>(only needed for Contacts; never stored, sent for this request only)</em></span>
+          <input type="password" name="db_pwd" autocomplete="off">
+        </label>
+      </div>
+
+      <button type="submit">Run matching</button>
+    </form>
+
+    <section class="hint">
+      <h2>How field detection works</h2>
+      <ul>
+        <li><strong>Full Name</strong> is the only required column.</li>
+        <li>Any of <strong>Company Name</strong>, <strong>Phone</strong>,
+          <strong>Email</strong> that are present and non-empty are used as
+          extra matching signals, in any combination.</li>
+        <li>A tradeshow record is only reported as a match when the name
+          matches <em>and</em> at least one other available field also
+          matches.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

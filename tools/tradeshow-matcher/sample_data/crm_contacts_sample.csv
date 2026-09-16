@@ -1,0 +1,5 @@
+First Name;Middle Name;Last Name;Status;Company;Responsible;Work Phone;Mobile;Fax;Home Phone;Other Phone Number;Work E-mail;Home E-mail;Other E-mail;Company NMLS;MLO’s NMLS;ID
+John;;Smith;Active;Acme Lending;rep1;+1 (305) 555-0100;;;;;john.smith@acmelending.com;;;1111;5555;101
+Maria;;Garcia;Active;Best Mortgage;rep2;;305-555-0199;;;;;maria.garcia@bestmortgage.com;;2222;6666;102
+Bob;;Lee;Active;Lee Capital;rep1;;;;;;bob.lee@leecapital.com;;;3333;7777;103
+Alice;;Nguyen;Active;Nguyen Realty;rep3;;786-555-0200;;;;;alice.nguyen@gmail.com;;4444;8888;104
