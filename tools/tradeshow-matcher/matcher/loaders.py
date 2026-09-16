@@ -84,7 +84,7 @@ def load_tradeshow_file(file_obj, filename: str) -> tuple[pd.DataFrame, list[str
 
     detected = []
     for field in OPTIONAL_MATCH_FIELDS:
-        if field in df.columns and df[field].fillna("").astype(str).str.strip().ne("").any():
+        if field in df.columns and cleaning.safe_str_series(df[field]).str.strip().ne("").any():
             detected.append(field)
         elif field not in df.columns:
             df[field] = ""
@@ -120,8 +120,8 @@ def load_crm_contacts(file_obj) -> pd.DataFrame:
     df["Email"] = cleaning.combine_non_empty(df, _CONTACT_EMAIL_COLS)
     df["Phone"] = cleaning.combine_non_empty(df, _CONTACT_PHONE_COLS)
 
-    first = df.get("First Name", pd.Series([""] * len(df))).fillna("")
-    last = df.get("Last Name", pd.Series([""] * len(df))).fillna("")
+    first = cleaning.safe_str_series(df.get("First Name", pd.Series([""] * len(df))))
+    last = cleaning.safe_str_series(df.get("Last Name", pd.Series([""] * len(df))))
     df["First Name"] = first.str.split(" ").str[0].str.lower()
     df["Last Name"] = last.str.split(" ").str[-1].str.lower()
     df["Full Name"] = cleaning.build_full_name(df["First Name"], df["Last Name"])
@@ -170,9 +170,9 @@ def load_crm_leads(file_obj) -> pd.DataFrame:
     df["Email"] = cleaning.combine_non_empty(df, _LEAD_EMAIL_COLS)
     df["Phone"] = cleaning.combine_non_empty(df, _LEAD_PHONE_COLS)
 
-    lead_name = df.get("Lead Name", pd.Series([""] * len(df))).fillna("")
-    first = lead_name.str.split().str[0].fillna("").astype(str)
-    last = lead_name.str.split().str[-1].fillna("").astype(str)
+    lead_name = cleaning.safe_str_series(df.get("Lead Name", pd.Series([""] * len(df))))
+    first = cleaning.safe_str_series(lead_name.str.split().str[0])
+    last = cleaning.safe_str_series(lead_name.str.split().str[-1])
     df["Full Name"] = cleaning.build_full_name(first, last)
     df["First Name"] = first.str.lower()
     df["Last Name"] = last.str.lower()
@@ -202,18 +202,9 @@ def load_crm_leads(file_obj) -> pd.DataFrame:
 
 
 def _col(df: pd.DataFrame, name: str) -> pd.Series:
-    """Fetch a column as a string Series, or an all-empty Series if absent.
-
-    Converts element-by-element rather than df[name].fillna("").astype(str):
-    fillna("") raises "Invalid value '' for dtype Int64" on nullable-integer
-    columns (e.g. iBitrix_Contact_NMLS, which pandas' read_sql returns as
-    Int64) because you can't insert a string into an integer-typed array.
-    astype(object) first avoids .apply() silently upcasting a nullable
-    Int64 column with missing values to float64 (which would turn 1111
-    into "1111.0").
-    """
+    """Fetch a column as a string Series, or an all-empty Series if absent."""
     if name in df.columns:
-        return df[name].astype(object).apply(lambda x: "" if pd.isna(x) else str(x))
+        return cleaning.safe_str_series(df[name])
     return pd.Series([""] * len(df), index=df.index)
 
 
@@ -255,8 +246,8 @@ def standardize_db_leads(df: pd.DataFrame) -> pd.DataFrame:
     df["Phone"] = cleaning.clean_phone_series(df["Phone"])
 
     lead_name = _col(df, "TITLE")
-    first = lead_name.str.split().str[0].fillna("").astype(str)
-    last = lead_name.str.split().str[-1].fillna("").astype(str)
+    first = cleaning.safe_str_series(lead_name.str.split().str[0])
+    last = cleaning.safe_str_series(lead_name.str.split().str[-1])
     df["Full Name"] = cleaning.build_full_name(first, last)
     df["First Name"] = first.str.lower()
     df["Last Name"] = last.str.lower()

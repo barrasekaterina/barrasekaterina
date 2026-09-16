@@ -11,6 +11,8 @@ import re
 
 import pandas as pd
 
+from .cleaning import safe_str_series
+
 JOB_TITLE_CATEGORIES: dict[str, list[str]] = {
     "Owner/ CEO/ President": [
         "owner", "ceo", "president", "co-founder", "cofounder",
@@ -80,7 +82,7 @@ def assign_domain_flag(email_domain: str, crm_domains: set[str]) -> str:
 
 
 def crm_email_domains(crm_df: pd.DataFrame) -> set[str]:
-    emails = crm_df["Email"].astype(str).str.lower()
+    emails = safe_str_series(crm_df["Email"]).str.lower()
     domains = emails.str.extract(r"@([^.]+)")[0]
     return set(domains.dropna())
 
@@ -96,7 +98,7 @@ def enrich_and_score_status(
     df = merged.copy()
 
     if "Job Title" in df.columns:
-        df["Job_Category"] = df["Job Title"].fillna("").apply(categorize_job_title)
+        df["Job_Category"] = safe_str_series(df["Job Title"]).apply(categorize_job_title)
     else:
         df["Job_Category"] = ""
 
@@ -110,7 +112,7 @@ def enrich_and_score_status(
     )
 
     if "Email" in df.columns:
-        df["domain_tradeshow"] = df["Email"].astype(str).str.lower().str.extract(r"@([^.]+)")[0]
+        df["domain_tradeshow"] = safe_str_series(df["Email"]).str.lower().str.extract(r"@([^.]+)")[0]
         df["New Contact"] = df["domain_tradeshow"].apply(
             lambda d: assign_domain_flag(d, crm_contacts_domains)
         )

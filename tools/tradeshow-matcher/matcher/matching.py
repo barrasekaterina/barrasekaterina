@@ -29,14 +29,15 @@ def match_tradeshow_to_crm(tradeshow: pd.DataFrame, crm: pd.DataFrame, fields: l
     tradeshow = tradeshow.copy()
     crm = crm.copy()
 
+    from .cleaning import normalize_phone_set, safe_str_series
+
     for col in ["Full Name", "First Name", "Last Name", "Company Name", "Email"]:
-        tradeshow[col] = tradeshow[col].astype(str).fillna("")
-        crm[col] = crm[col].astype(str).fillna("")
+        tradeshow[col] = safe_str_series(tradeshow[col])
+        crm[col] = safe_str_series(crm[col])
 
     if "Phone" in fields:
-        from .cleaning import normalize_phone_set
-        tradeshow["_phone_set"] = tradeshow["Phone"].astype(str).apply(normalize_phone_set)
-        crm["_phone_set"] = crm["Phone"].astype(str).apply(normalize_phone_set)
+        tradeshow["_phone_set"] = safe_str_series(tradeshow["Phone"]).apply(normalize_phone_set)
+        crm["_phone_set"] = safe_str_series(crm["Phone"]).apply(normalize_phone_set)
 
     indexer = recordlinkage.Index()
     indexer.sortedneighbourhood("Full Name")

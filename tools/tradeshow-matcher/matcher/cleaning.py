@@ -17,9 +17,35 @@ _HASH_STRIP_PATTERN = re.compile(r"#[^,]*")
 _OFFICE_STRIP_PATTERN = re.compile(r"Office:[^,]*")
 
 
+def safe_str_series(series: pd.Series) -> pd.Series:
+    """Convert any Series to plain strings, missing values becoming "".
+
+    Never use series.fillna("").astype(str) or series.astype(str).fillna(""):
+    - fillna("") on a nullable extension dtype (Int64, Float64, boolean,
+      "string") raises "Invalid value '' for dtype ..." - you can't insert a
+      string into a typed array. This bit us for real once a live database
+      query actually returned an Int64 NMLS column with nulls.
+    - astype(str) on those same nullable dtypes "succeeds" but turns missing
+      values into the literal 4-character text "<NA>", which then silently
+      leaks into output since it's no longer a real missing value for a
+      later fillna("") to catch.
+    astype(object) first, then a per-element pd.isna check, sidesteps both:
+    every element is handled as whatever Python object it actually is
+    before any dtype-level rules can reject or mis-stringify it.
+    """
+    return series.astype(object).apply(lambda x: "" if pd.isna(x) else str(x))
+
+
+def safe_str_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply safe_str_series to every column - for blindly stringifying a
+    whole table (e.g. before to_dict()/display) regardless of what dtype
+    any individual column ended up with."""
+    return df.apply(safe_str_series)
+
+
 def clean_phone_series(phone: pd.Series) -> pd.Series:
     """Strip extensions/symbols and a leading country '1' from a phone column."""
-    phone = phone.astype(str)
+    phone = safe_str_series(phone)
     phone = phone.str.replace(_EXT_STRIP_PATTERN, "", regex=True)
     phone = phone.str.replace(_HASH_STRIP_PATTERN, "", regex=True)
     phone = phone.str.replace(_OFFICE_STRIP_PATTERN, "", regex=True)
@@ -71,8 +97,8 @@ def split_full_name(full_name: str) -> tuple[str, str]:
 
 
 def build_full_name(first: pd.Series, last: pd.Series) -> pd.Series:
-    first = first.fillna("").astype(str).str.lower()
-    last = last.fillna("").astype(str).str.lower()
+    first = safe_str_series(first).str.lower()
+    last = safe_str_series(last).str.lower()
     return (first + " " + last).str.strip()
 
 

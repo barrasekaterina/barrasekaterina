@@ -15,6 +15,7 @@ import uuid
 from flask import Flask, jsonify, render_template, request, send_file
 
 from matcher import db, loaders
+from matcher.cleaning import safe_str_frame
 from matcher.pipeline import run_pipeline, write_excel
 
 app = Flask(__name__)
@@ -111,7 +112,7 @@ def run():
     print(f"[matcher] Ready: {out_path}", flush=True)
 
     preview_cols = list(result.table.columns[:10])
-    preview_rows = result.table[preview_cols].head(200).fillna("").astype(str).values.tolist()
+    preview_rows = safe_str_frame(result.table[preview_cols].head(200)).values.tolist()
 
     return render_template(
         "results.html",
@@ -138,7 +139,7 @@ def api_contacts():
     except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
         print(f"[matcher] (extension) Contacts fetch failed: {exc}", flush=True)
         return jsonify(error=str(exc)), 500
-    return jsonify(rows=standardized.fillna("").to_dict(orient="records"))
+    return jsonify(rows=safe_str_frame(standardized).to_dict(orient="records"))
 
 
 @app.route("/api/leads", methods=["POST", "OPTIONS"])
@@ -156,7 +157,7 @@ def api_leads():
     except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
         print(f"[matcher] (extension) Leads fetch failed: {exc}", flush=True)
         return jsonify(error=str(exc)), 500
-    return jsonify(rows=standardized.fillna("").to_dict(orient="records"))
+    return jsonify(rows=safe_str_frame(standardized).to_dict(orient="records"))
 
 
 @app.route("/download/<token>")

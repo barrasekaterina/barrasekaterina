@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from . import enrich, loaders, matching
+from . import cleaning, enrich, loaders, matching
 
 STATUS_COLORS = {
     "Duplicate": "8A2BE2",
@@ -94,7 +94,7 @@ def run_pipeline(
         result["contact_full_match"] = result["Full Name"].isin(full_match_names)
         if "ID" in agg_contacts.columns:
             id_map = dict(zip(agg_contacts[key], agg_contacts["ID"]))
-            result["Contact CRM ID"] = result["Full Name"].map(id_map).fillna("")
+            result["Contact CRM ID"] = cleaning.safe_str_series(result["Full Name"].map(id_map))
 
     if agg_leads is not None and not agg_leads.empty:
         key = "Full Name_tradeshow"
@@ -102,7 +102,7 @@ def run_pipeline(
         result["is_lead_match"] = result["Full Name"].isin(matched_names)
         if "ID" in agg_leads.columns:
             id_map = dict(zip(agg_leads[key], agg_leads["ID"]))
-            result["Lead CRM ID"] = result["Full Name"].map(id_map).fillna("")
+            result["Lead CRM ID"] = cleaning.safe_str_series(result["Full Name"].map(id_map))
 
     crm_domains = enrich.crm_email_domains(crm_contacts) if crm_contacts is not None else set()
     result = enrich.enrich_and_score_status(
