@@ -49,6 +49,25 @@
       .replace(/>/g, "&gt;");
   }
 
+  const dbFieldsBox = document.getElementById("db-fields");
+  function anyLiveSourceSelected() {
+    return (
+      document.querySelector('input[name="crm_contacts_source"]:checked').value === "live" ||
+      document.querySelector('input[name="crm_leads_source"]:checked').value === "live"
+    );
+  }
+  function refreshSourceVisibility() {
+    document.getElementById("contacts-upload").hidden =
+      document.querySelector('input[name="crm_contacts_source"]:checked').value === "live";
+    document.getElementById("leads-upload").hidden =
+      document.querySelector('input[name="crm_leads_source"]:checked').value === "live";
+    dbFieldsBox.hidden = !anyLiveSourceSelected();
+  }
+  document.querySelectorAll('input[name="crm_contacts_source"], input[name="crm_leads_source"]').forEach((el) => {
+    el.addEventListener("change", refreshSourceVisibility);
+  });
+  refreshSourceVisibility();
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     clearError();
@@ -58,15 +77,43 @@
       showError("Please choose a tradeshow file.");
       return;
     }
-    const crmContactsFile = document.getElementById("crm_contacts_file").files[0] || null;
-    const crmLeadsFile = document.getElementById("crm_leads_file").files[0] || null;
+
+    const contactsSource = document.querySelector('input[name="crm_contacts_source"]:checked').value;
+    const leadsSource = document.querySelector('input[name="crm_leads_source"]:checked').value;
+    const backendUrl = document.getElementById("db_backend_url").value.trim();
+    const dbServer = document.getElementById("db_server").value.trim() || undefined;
 
     const runBtn = document.getElementById("run-btn");
     runBtn.disabled = true;
     runBtn.textContent = "Running...";
 
     try {
-      const result = await Pipeline.runPipeline({ tradeshowFile, crmContactsFile, crmLeadsFile });
+      let crmContactsFile = null;
+      let crmContactsRows = null;
+      let crmLeadsFile = null;
+      let crmLeadsRows = null;
+
+      if (contactsSource === "live") {
+        const uid = document.getElementById("db_uid").value;
+        const pwd = document.getElementById("db_pwd").value;
+        crmContactsRows = await DbClient.fetchContactsLive(backendUrl, { server: dbServer, uid, pwd });
+      } else {
+        crmContactsFile = document.getElementById("crm_contacts_file").files[0] || null;
+      }
+
+      if (leadsSource === "live") {
+        crmLeadsRows = await DbClient.fetchLeadsLive(backendUrl, { server: dbServer });
+      } else {
+        crmLeadsFile = document.getElementById("crm_leads_file").files[0] || null;
+      }
+
+      const result = await Pipeline.runPipeline({
+        tradeshowFile,
+        crmContactsFile,
+        crmLeadsFile,
+        crmContactsRows,
+        crmLeadsRows,
+      });
       lastResult = result;
 
       document.getElementById("detected-fields").textContent = result.detectedFields.length
@@ -82,6 +129,8 @@
     } finally {
       runBtn.disabled = false;
       runBtn.textContent = "Run matching";
+      // Never leave the password sitting in the DOM longer than this run needs.
+      document.getElementById("db_pwd").value = "";
     }
   });
 
@@ -102,5 +151,6 @@
     lastResult = null;
     resultsCard.hidden = true;
     uploadCard.hidden = false;
+    refreshSourceVisibility();
   });
 })();

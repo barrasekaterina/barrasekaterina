@@ -65,6 +65,17 @@ The tradeshow file can be `.csv` or `.xlsx` and just needs a name column —
 common header spellings (Name, Full Name, Company/Organization,
 Phone/Phone Number, Email/E-mail) are recognized automatically.
 
+## Also used as a backend by the browser extension
+
+`tools/tradeshow-matcher-extension/` is a Chrome/Edge extension version of
+this same tool. It runs entirely client-side, but a browser can't open a
+direct SQL Server connection, so its "Pull live via local backend" option
+calls this Flask app's `/api/contacts` and `/api/leads` JSON endpoints
+instead, which do the real `pyodbc` call and return standardized rows. Keep
+`python app.py` running here if you want to use that option from the
+extension. CORS on those two routes is restricted to `chrome-extension://`
+origins only (see `app.py`) — never widen that to `*`.
+
 ## Sample data
 
 `sample_data/make_samples.py` generates small synthetic fixtures covering

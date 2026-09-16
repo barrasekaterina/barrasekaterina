@@ -17,13 +17,31 @@ accordingly. There is no business-card (BC) input or matching path.
    folder.
 4. Click the extension's icon in the toolbar, then **Open matcher**.
 
+## Live CRM database pull
+
+A browser extension still can't open a direct SQL Server (ODBC) connection
+itself — that's a hard platform limitation, not a missing feature. Instead,
+"Pull live via local backend" on each of the CRM Contacts/Leads fields sends
+the request to the Flask app in `tools/tradeshow-matcher/` running on your
+machine (`python app.py`, default `http://127.0.0.1:5050`), which does the
+real `pyodbc` connection and hands back standardized rows over
+`/api/contacts` / `/api/leads`. So the extension is the UI; the local Flask
+process is what actually talks to the database. You need that Flask app
+running whenever you use the live-DB option — CSV upload doesn't need it.
+
+The DB password (Contacts only; Leads uses Windows Integrated Auth) is only
+ever held in the page's memory for the one request, is cleared from the
+form right after the run, and is never written to `chrome.storage` or any
+log. It does travel over plain HTTP to `127.0.0.1`, which is fine for
+localhost but don't repoint the backend URL at a non-local, non-HTTPS host.
+
+CORS on the Flask side (`app.py`) is restricted to `chrome-extension://`
+origins specifically — never opened to `*` — because the Leads endpoint
+needs no credentials at all; an open CORS policy would let any website you
+happen to have open in another tab silently query it while the server runs.
+
 ## What's different from the Python/Flask version
 
-- **No live CRM database pull.** A browser can't open a direct SQL Server
-  (ODBC) connection, so this version only supports uploading the CRM
-  Contacts/Leads CSV exports. Use the Python version's "pull live from CRM
-  database" option (`tools/tradeshow-matcher/matcher/db.py`) if you need
-  that.
 - **Excel export has no color-coded Status column.** The vendored
   `lib/xlsx.full.min.js` is the free/community build of SheetJS, which can
   write hyperlinks but not cell fill colors (that's a paid-tier feature of
@@ -45,6 +63,9 @@ accordingly. There is no business-card (BC) input or matching path.
 - `js/cleaning.js`, `js/loaders.js`, `js/matching.js`, `js/enrich.js`,
   `js/pipeline.js`, `js/export.js` — ported matching engine, one module per
   concern, mirroring `tools/tradeshow-matcher/matcher/*.py`.
+- `js/db.js` — client for the local Flask backend's `/api/contacts` /
+  `/api/leads` endpoints, used only by the "Pull live via local backend"
+  option.
 - `lib/xlsx.full.min.js` — vendored SheetJS (Apache-2.0), used to parse
   uploaded `.csv`/`.xlsx` files and to build the downloadable export.
 

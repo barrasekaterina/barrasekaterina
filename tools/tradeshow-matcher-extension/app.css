@@ -80,6 +80,33 @@ button:disabled { opacity: 0.6; cursor: default; }
   border: 1px solid var(--accent);
 }
 
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 18px 0;
+  padding: 12px 16px;
+}
+
+legend { font-weight: 600; padding: 0 4px; }
+legend em { color: var(--muted); font-weight: 400; font-style: normal; font-size: 0.85rem; }
+
+label.radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+  margin: 8px 0;
+}
+
+label.radio input { width: auto; margin: 0; }
+
+.hint code {
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.85em;
+}
+
 .hint {
   margin-top: 28px;
   padding-top: 16px;

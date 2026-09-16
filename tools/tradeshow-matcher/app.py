@@ -12,7 +12,7 @@ import os
 import tempfile
 import uuid
 
-from flask import Flask, render_template, request, send_file
+from flask import Flask, jsonify, render_template, request, send_file
 
 from matcher import db, loaders
 from matcher.pipeline import run_pipeline, write_excel
@@ -22,6 +22,25 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-only-not-secret")
 
 RESULTS_DIR = os.path.join(tempfile.gettempdir(), "tradeshow_matcher_results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
+
+# The /api/* routes below exist so the browser-extension version of this
+# tool (which cannot open a direct SQL Server connection itself) can reach
+# the CRM database through this locally-running backend instead. CORS is
+# deliberately restricted to chrome-extension:// origins, never "*" - an
+# open CORS policy here would let ANY website you happen to have open
+# silently call these endpoints (one of which needs no credentials at all)
+# and read your CRM data for as long as this server is running.
+ALLOWED_ORIGIN_PREFIX = "chrome-extension://"
+
+
+@app.after_request
+def add_extension_cors_headers(response):
+    origin = request.headers.get("Origin", "")
+    if origin.startswith(ALLOWED_ORIGIN_PREFIX):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
 
 
 @app.route("/", methods=["GET"])
@@ -90,6 +109,38 @@ def run():
         preview_rows=preview_rows,
         download_token=token,
     )
+
+
+@app.route("/api/contacts", methods=["POST", "OPTIONS"])
+def api_contacts():
+    if request.method == "OPTIONS":
+        return "", 204
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        raw = db.fetch_contacts(
+            uid=payload.get("uid") or None,
+            pwd=payload.get("pwd") or None,
+            server=payload.get("server") or None,
+        )
+        standardized = loaders.standardize_db_contacts(raw)
+    except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
+        return jsonify(error=str(exc)), 500
+    return jsonify(rows=standardized.fillna("").to_dict(orient="records"))
+
+
+@app.route("/api/leads", methods=["POST", "OPTIONS"])
+def api_leads():
+    if request.method == "OPTIONS":
+        return "", 204
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        raw = db.fetch_leads(server=payload.get("server") or None)
+        standardized = loaders.standardize_db_leads(raw)
+    except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
+        return jsonify(error=str(exc)), 500
+    return jsonify(rows=standardized.fillna("").to_dict(orient="records"))
 
 
 @app.route("/download/<token>")

@@ -17,11 +17,21 @@
     return best;
   }
 
-  async function runPipeline({ tradeshowFile, crmContactsFile, crmLeadsFile }) {
+  // crmContactsRows / crmLeadsRows let a caller (e.g. the live-DB path in
+  // app.js, which fetches already-standardized rows from the local Flask
+  // backend) skip file parsing entirely. They win over crmContactsFile /
+  // crmLeadsFile when both are given for the same source.
+  async function runPipeline({
+    tradeshowFile,
+    crmContactsFile,
+    crmLeadsFile,
+    crmContactsRows,
+    crmLeadsRows,
+  }) {
     const { rows: tradeshow, detectedFields } = await Loaders.loadTradeshowFile(tradeshowFile);
 
-    const crmContacts = crmContactsFile ? await Loaders.loadCrmContacts(crmContactsFile) : null;
-    const crmLeads = crmLeadsFile ? await Loaders.loadCrmLeads(crmLeadsFile) : null;
+    const crmContacts = crmContactsRows || (crmContactsFile ? await Loaders.loadCrmContacts(crmContactsFile) : null);
+    const crmLeads = crmLeadsRows || (crmLeadsFile ? await Loaders.loadCrmLeads(crmLeadsFile) : null);
 
     const contactMatches = crmContacts ? Matching.matchTradeshowToCrm(tradeshow, crmContacts, detectedFields) : [];
     const leadMatches = crmLeads ? Matching.matchTradeshowToCrm(tradeshow, crmLeads, detectedFields) : [];
