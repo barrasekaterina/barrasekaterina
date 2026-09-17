@@ -102,7 +102,7 @@
       "Full Name", "Company Name", "Phone", "Email", "Job Title",
       "Job_Category", "Banks and Credit Unions", "Duplicate", "New Contact",
       "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
-      "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName",
+      "NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName",
     ].filter((c) => c in (result[0] || {}));
 
     const summary = {
@@ -126,6 +126,7 @@
       const match = byId.get(String(row["MLO NMLS"] || ""));
       return {
         ...row,
+        "NMLS FullName": match ? match.FullName || "" : "",
         "NMLS RegulationType": match ? match.RegulationType || "" : "",
         "NMLS LicensingStatus": match ? match.LicensingStatus || "" : "",
         "NMLS LocationNMLSID": match ? match.LocationNMLSID || "" : "",
@@ -133,7 +134,7 @@
       };
     });
     const displayCols = [...pipelineResult.displayCols];
-    ["NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName"].forEach((c) => {
+    ["NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName"].forEach((c) => {
       if (!displayCols.includes(c)) displayCols.push(c);
     });
     return { ...pipelineResult, table, displayCols };

@@ -75,8 +75,10 @@ Phone/Phone Number, Email/E-mail) are recognized automatically.
 
 The "NMLS enrichment" checkbox looks up each matched attendee in a
 *different* database - the NMLS database on `p-nmls-db01.admortgage.com` -
-and adds `NMLS RegulationType` (State-Licensed / Federally Registered /
-Dual / None), `NMLS LicensingStatus` (Active/Inactive), `NMLS
+and adds `NMLS FullName` (that individual's own First/Last Name from
+`dbo.Individual`, so you can visually compare it against the attendee's
+own Full Name), `NMLS RegulationType` (State-Licensed / Federally
+Registered / Dual / None), `NMLS LicensingStatus` (Active/Inactive), `NMLS
 LocationNMLSID`, and `NMLS LocationName` (the company or branch that
 person is currently authorized to represent, from `dbo.Company.Name` or
 `dbo.Branch.Name`), plus `NMLS Match Method` saying how each row was
@@ -87,12 +89,13 @@ looked up:
    it's an exact, unambiguous id, so it always wins when available.
 2. **`Name+Company`** - only for attendees with *no* CRM match at all.
    Falls back to fuzzy-matching their Full Name against `dbo.Individual`
-   (blocked on exact `LastName`, Jaro-Winkler on First/Last), then - since
-   a name alone can match more than one NMLS individual - uses their
-   Company Name to pick the right one by comparing it against each
-   candidate's resolved company/branch name. If more than one candidate
-   remains and there's no Company Name to disambiguate with (or none of
-   the candidates' companies match well enough), the attendee is left
+   (blocked on exact `LastName`, Jaro-Winkler on First/Last), then always
+   also compares Company Name against each name-candidate's resolved
+   company/branch name - a name match alone is never enough to accept a
+   result, even when it's the only name candidate. If there's no Company
+   Name to compare (blank), a single unambiguous name candidate is still
+   accepted; multiple name candidates with no Company Name, or none of the
+   candidates' companies matching well enough, leaves the attendee
    unmatched rather than guessing.
 3. Blank `NMLS Match Method` - neither path found anything (no CRM match
    and no confident NMLS name match).

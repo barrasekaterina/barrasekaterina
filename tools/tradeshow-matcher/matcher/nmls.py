@@ -33,7 +33,7 @@ import os
 
 import pandas as pd
 
-from .cleaning import safe_str_series
+from .cleaning import build_full_name, safe_str_series
 
 # Active license statuses per the NMLS B2B Data Specification.
 ACTIVE_LICENSE_STATUSES = {
@@ -47,7 +47,7 @@ ACTIVE_LICENSE_STATUSES = {
 }
 
 ENRICHMENT_COLUMNS = [
-    "IndividualNMLSID", "RegulationType", "LicensingStatus",
+    "IndividualNMLSID", "FullName", "RegulationType", "LicensingStatus",
     "LocationNMLSID", "LocationType", "OwningCompanyNMLSID", "LocationName",
 ]
 
@@ -116,7 +116,7 @@ def fetch_nmls_enrichment(
     with pyodbc.connect(conn_str) as conn:
         df_individual = _read_scoped(
             conn,
-            "SELECT DISTINCT IndividualNMLSID FROM dbo.Individual "
+            "SELECT DISTINCT IndividualNMLSID, FirstName, LastName FROM dbo.Individual "
             "WHERE IsDeleted = 0 AND IndividualNMLSID IN ({placeholders})",
             ids,
         )
@@ -125,7 +125,12 @@ def fetch_nmls_enrichment(
         df_individual["IndividualNMLSID"] = pd.to_numeric(
             df_individual["IndividualNMLSID"], errors="coerce"
         ).astype("Int64")
-        df_individual = df_individual.dropna(subset=["IndividualNMLSID"]).drop_duplicates()
+        df_individual = df_individual.dropna(subset=["IndividualNMLSID"]).drop_duplicates(
+            subset=["IndividualNMLSID"]
+        )
+        df_individual["FullName"] = build_full_name(
+            df_individual["FirstName"], df_individual["LastName"]
+        )
         known_ids = df_individual["IndividualNMLSID"].astype("int64").tolist()
 
         # -- Regulation type + licensing status -----------------------------
@@ -377,21 +382,21 @@ def match_individuals_by_name(
       touched, so callers already doing CRM-based enrichment can reuse it
       instead of a second round trip for the same ids.
 
-    dbo.Individual.LastName is matched via a plain "IN (...)" (relying on
-    SQL Server's usual case-insensitive collation), not LOWER(LastName),
-    since wrapping the column in a function would block index usage on a
-    table this large.
+    dbo.Individual.LastName is matched via "UPPER(LastName) IN (...)"
+    rather than a plain IN, since some NMLS-style registry databases use a
+    case-sensitive collation where a plain IN against differently-cased
+    params would silently return zero rows.
     """
     import pyodbc  # imported lazily: optional dependency, only needed for this path
     import recordlinkage
 
     attendees = attendees.copy()
-    attendees["First Name"] = safe_str_series(attendees["First Name"]).str.lower()
-    attendees["Last Name"] = safe_str_series(attendees["Last Name"]).str.lower()
+    attendees["First Name"] = safe_str_series(attendees["First Name"]).str.lower().str.strip()
+    attendees["Last Name"] = safe_str_series(attendees["Last Name"]).str.lower().str.strip()
     attendees["Company Name"] = safe_str_series(
         attendees["Company Name"] if "Company Name" in attendees.columns
         else pd.Series([""] * len(attendees), index=attendees.index)
-    ).str.lower()
+    ).str.lower().str.strip()
 
     empty_ids = pd.Series([""] * len(attendees), index=attendees.index)
     last_names = sorted({n for n in attendees["Last Name"] if n})
@@ -420,8 +425,13 @@ def match_individuals_by_name(
         candidates["IndividualNMLSID"] = pd.to_numeric(candidates["IndividualNMLSID"], errors="coerce").astype("Int64")
         candidates = candidates.dropna(subset=["IndividualNMLSID"])
         candidates = candidates.rename(columns={"FirstName": "First Name", "LastName": "Last Name"})
-        candidates["First Name"] = safe_str_series(candidates["First Name"]).str.lower()
-        candidates["Last Name"] = safe_str_series(candidates["Last Name"]).str.lower()
+        # .str.strip() guards against dbo.Individual storing these as
+        # fixed-width CHAR columns - SQL Server's own comparisons ignore
+        # trailing spaces, but the raw values pandas gets back would still
+        # carry them, which would silently break the exact-match blocking
+        # below ("smith" != "smith   ").
+        candidates["First Name"] = safe_str_series(candidates["First Name"]).str.lower().str.strip()
+        candidates["Last Name"] = safe_str_series(candidates["Last Name"]).str.lower().str.strip()
 
         indexer = recordlinkage.Index()
         indexer.block("Last Name")
@@ -451,18 +461,23 @@ def match_individuals_by_name(
     chosen: dict[int, str] = {}
     for attendee_idx in features.index.get_level_values(0).unique():
         row_candidates = candidates.loc[features.loc[attendee_idx].index, "IndividualNMLSID"].astype("int64")
-        if len(row_candidates) == 1:
-            chosen[attendee_idx] = str(row_candidates.iloc[0])
+        company = attendees.loc[attendee_idx, "Company Name"]
+
+        if not company:
+            # Nothing to compare Company Name against - only accept when
+            # the name alone was already unambiguous.
+            if len(row_candidates) == 1:
+                chosen[attendee_idx] = str(row_candidates.iloc[0])
             continue
 
-        company = attendees.loc[attendee_idx, "Company Name"]
-        if not company:
-            continue  # multiple same-named people, no company to disambiguate with - leave unmatched
-
+        # Every candidate gets a real name+company fuzzy comparison, even
+        # when there's only one name candidate - a name match by itself
+        # isn't proof it's the same person, so Company Name always has to
+        # be checked too, not just used to break ties between several.
         best_id, best_score = None, 0.0
         for cand_id in row_candidates:
-            cand_company = location_name_by_id.get(str(cand_id), "")
-            score = jaro_winkler_similarity(company, cand_company.lower()) if cand_company else 0.0
+            cand_company = str(location_name_by_id.get(str(cand_id), "")).strip().lower()
+            score = jaro_winkler_similarity(company, cand_company) if cand_company else 0.0
             if score > best_score:
                 best_id, best_score = cand_id, score
         if best_id is not None and best_score >= COMPANY_THRESHOLD:
@@ -485,7 +500,7 @@ def merge_nmls_enrichment(table: pd.DataFrame, enrichment: pd.DataFrame, mlo_nml
     blank enrichment columns rather than being dropped."""
     if mlo_nmls_col not in table.columns or enrichment.empty:
         out = table.copy()
-        for col in ("RegulationType", "LicensingStatus", "LocationNMLSID", "LocationName"):
+        for col in ("FullName", "RegulationType", "LicensingStatus", "LocationNMLSID", "LocationName"):
             out[f"NMLS {col}"] = ""
         return out
 
@@ -493,6 +508,7 @@ def merge_nmls_enrichment(table: pd.DataFrame, enrichment: pd.DataFrame, mlo_nml
     ids = safe_str_series(table[mlo_nmls_col])
 
     out = table.copy()
+    out["NMLS FullName"] = ids.map(lookup["FullName"]).fillna("") if "FullName" in lookup else ""
     out["NMLS RegulationType"] = ids.map(lookup["RegulationType"]).fillna("") if "RegulationType" in lookup else ""
     out["NMLS LicensingStatus"] = ids.map(lookup["LicensingStatus"]).fillna("") if "LicensingStatus" in lookup else ""
     out["NMLS LocationNMLSID"] = ids.map(lookup["LocationNMLSID"]).fillna("") if "LocationNMLSID" in lookup else ""

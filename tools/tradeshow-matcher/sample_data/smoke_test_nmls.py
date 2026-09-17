@@ -35,7 +35,11 @@ from matcher import nmls  # noqa: E402  (must come after the pyodbc stub)
 
 # --- Canned table contents --------------------------------------------------
 TABLES = {
-    "dbo.Individual": pd.DataFrame({"IndividualNMLSID": [5555, 9999, 7777]}),
+    "dbo.Individual": pd.DataFrame({
+        "IndividualNMLSID": [5555, 9999, 7777],
+        "FirstName": ["John", "Carla", "No"],
+        "LastName": ["Smith", "Diaz", "One"],
+    }),
     "dbo.IndividualLicense": pd.DataFrame({
         "IndividualNMLSID": [5555],
         "IsAuthorized": ["Yes"],
@@ -120,6 +124,7 @@ print(result.to_string())
 assert set(result["IndividualNMLSID"]) == {5555, 9999, 7777}
 
 row_5555 = result[result["IndividualNMLSID"] == 5555].iloc[0]
+assert row_5555["FullName"] == "john smith", row_5555["FullName"]
 assert row_5555["RegulationType"] == "State-Licensed", row_5555["RegulationType"]
 assert row_5555["LicensingStatus"] == "Active"
 assert row_5555["LocationName"] == "Acme Lending", row_5555["LocationName"]
@@ -141,6 +146,9 @@ table = pd.DataFrame({
 })
 merged = nmls.merge_nmls_enrichment(table, result)
 print("\n", merged.to_string())
+assert merged.loc[0, "NMLS FullName"] == "john smith", merged.loc[0, "NMLS FullName"]
+assert merged.loc[1, "NMLS FullName"] == "carla diaz", merged.loc[1, "NMLS FullName"]
+assert merged.loc[2, "NMLS FullName"] == ""
 assert merged.loc[0, "NMLS LocationName"] == "Acme Lending"
 assert merged.loc[1, "NMLS LocationName"] == "Downtown Branch"
 assert merged.loc[2, "NMLS LocationName"] == ""

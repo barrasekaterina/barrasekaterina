@@ -136,6 +136,7 @@ def run():
             result.table = nmls.merge_nmls_enrichment(result.table, enrichment, mlo_nmls_col="NMLS ID Used")
         except Exception as exc:  # noqa: BLE001 - surface driver/connection errors, don't fail the whole run
             print(f"[matcher] NMLS enrichment failed: {exc}", flush=True)
+            result.table["NMLS FullName"] = ""
             result.table["NMLS RegulationType"] = ""
             result.table["NMLS LicensingStatus"] = ""
             result.table["NMLS LocationNMLSID"] = ""
@@ -147,7 +148,7 @@ def run():
     write_excel(result.table, out_path)
     print(f"[matcher] Ready: {out_path}", flush=True)
 
-    nmls_cols = [c for c in ("NMLS Match Method", "NMLS RegulationType", "NMLS LicensingStatus",
+    nmls_cols = [c for c in ("NMLS Match Method", "NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus",
                               "NMLS LocationNMLSID", "NMLS LocationName")
                  if c in result.table.columns]
     preview_cols = list(result.table.columns[:10]) + [c for c in nmls_cols if c not in result.table.columns[:10]]
