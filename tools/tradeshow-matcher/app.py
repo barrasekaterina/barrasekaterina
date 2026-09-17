@@ -134,6 +134,7 @@ def run():
                 enrichment = enrichment.drop_duplicates(subset=["IndividualNMLSID"])
 
             result.table = nmls.merge_nmls_enrichment(result.table, enrichment, mlo_nmls_col="NMLS ID Used")
+            result.table = nmls.compare_company_match(result.table)
         except Exception as exc:  # noqa: BLE001 - surface driver/connection errors, don't fail the whole run
             print(f"[matcher] NMLS enrichment failed: {exc}", flush=True)
             result.table["NMLS FullName"] = ""
@@ -141,6 +142,7 @@ def run():
             result.table["NMLS LicensingStatus"] = ""
             result.table["NMLS LocationNMLSID"] = ""
             result.table["NMLS LocationName"] = ""
+            result.table["Company Match"] = ""
 
     print("[matcher] Writing Excel...", flush=True)
     token = uuid.uuid4().hex
@@ -149,7 +151,7 @@ def run():
     print(f"[matcher] Ready: {out_path}", flush=True)
 
     nmls_cols = [c for c in ("NMLS Match Method", "NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus",
-                              "NMLS LocationNMLSID", "NMLS LocationName")
+                              "NMLS LocationNMLSID", "NMLS LocationName", "Company Match")
                  if c in result.table.columns]
     preview_cols = list(result.table.columns[:10]) + [c for c in nmls_cols if c not in result.table.columns[:10]]
     preview_rows = safe_str_frame(result.table[preview_cols].head(200)).values.tolist()

@@ -61,6 +61,13 @@ with *no* CRM match at all does this fall back to a second backend call
 NMLS itself (`matcher.nmls.match_individuals_by_name`) - the `NMLS Match
 Method` column shows "CRM" or "Name+Company" per row accordingly.
 
+A `Company Match` column also checks whether the company on file agrees
+with what NMLS currently shows for that MLO, the same way as the Flask
+version: exact `Company NMLS` id comparison first when available, else a
+*fuzzy* Company Name comparison (never exact string equality) against
+NMLS's resolved company/branch name - runs for every attendee with any
+NMLS match, CRM-derived or fallback alike.
+
 ## What's different from the Python/Flask version
 
 - **Excel export has no color-coded Status column.** The vendored

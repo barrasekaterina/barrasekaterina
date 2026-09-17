@@ -100,6 +100,19 @@ looked up:
 3. Blank `NMLS Match Method` - neither path found anything (no CRM match
    and no confident NMLS name match).
 
+A `Company Match` column checks whether the company on file agrees with
+what NMLS currently shows for that MLO - useful for spotting people who
+have since moved companies. It compares `Company NMLS` (the id already
+on the matched CRM Contact/Lead) against NMLS's `OwningCompanyNMLSID`
+exactly when both are available; otherwise it falls back to a *fuzzy*
+comparison (Jaro-Winkler, same threshold as the name+company matching
+above) of the attendee's own Company Name against NMLS's resolved
+company/branch name - never a plain string-equality check, since real
+company names vary in spelling/suffixes ("Acme Lending" vs "Acme Lending
+LLC"). This runs for every attendee with any NMLS match at all, including
+ones with no CRM record found only through the name+company fallback -
+blank means no NMLS match happened, not that the companies differ.
+
 Like the CRM pull, this authenticates via Windows Integrated Auth, no
 credentials needed. Unlike a typical bulk NMLS export (which processes the
 *entire* `dbo.Individual` table - hundreds of thousands of rows, meant to

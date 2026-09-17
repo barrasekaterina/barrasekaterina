@@ -500,7 +500,8 @@ def merge_nmls_enrichment(table: pd.DataFrame, enrichment: pd.DataFrame, mlo_nml
     blank enrichment columns rather than being dropped."""
     if mlo_nmls_col not in table.columns or enrichment.empty:
         out = table.copy()
-        for col in ("FullName", "RegulationType", "LicensingStatus", "LocationNMLSID", "LocationName"):
+        for col in ("FullName", "RegulationType", "LicensingStatus", "LocationNMLSID",
+                    "OwningCompanyNMLSID", "LocationName"):
             out[f"NMLS {col}"] = ""
         return out
 
@@ -512,5 +513,48 @@ def merge_nmls_enrichment(table: pd.DataFrame, enrichment: pd.DataFrame, mlo_nml
     out["NMLS RegulationType"] = ids.map(lookup["RegulationType"]).fillna("") if "RegulationType" in lookup else ""
     out["NMLS LicensingStatus"] = ids.map(lookup["LicensingStatus"]).fillna("") if "LicensingStatus" in lookup else ""
     out["NMLS LocationNMLSID"] = ids.map(lookup["LocationNMLSID"]).fillna("") if "LocationNMLSID" in lookup else ""
+    out["NMLS OwningCompanyNMLSID"] = (
+        ids.map(lookup["OwningCompanyNMLSID"]).fillna("") if "OwningCompanyNMLSID" in lookup else ""
+    )
     out["NMLS LocationName"] = ids.map(lookup["LocationName"]).fillna("") if "LocationName" in lookup else ""
+    return out
+
+
+def compare_company_match(
+    table: pd.DataFrame,
+    company_nmls_col: str = "Company NMLS",
+    company_name_col: str = "Company Name",
+) -> pd.DataFrame:
+    """Flag whether the company on file matches what NMLS currently shows
+    for that MLO, for every attendee that got any NMLS match at all -
+    whether that match came from a direct CRM-derived id or the
+    name+company fallback. Priority mirrors the request that drove this:
+    compare Company NMLS ids first (exact, unambiguous) when both the CRM
+    record and the NMLS lookup have one; only fall back to a *fuzzy*
+    Company Name comparison - never an exact string check - when an id
+    isn't available on both sides (e.g. an attendee with no CRM record at
+    all still has their own typed Company Name to fuzzy-compare against
+    NMLS's resolved company/branch name)."""
+    out = table.copy()
+    if "NMLS OwningCompanyNMLSID" not in out.columns:
+        out["Company Match"] = ""
+        return out
+
+    crm_company_nmls = safe_str_series(out.get(company_nmls_col, ""))
+    nmls_company_nmls = safe_str_series(out["NMLS OwningCompanyNMLSID"])
+    nmls_location_name = safe_str_series(out.get("NMLS LocationName", "")).str.strip().str.lower()
+    attendee_company_name = safe_str_series(out.get(company_name_col, "")).str.strip().str.lower()
+
+    def compare_row(crm_id: str, nmls_id: str, attendee_name: str, location_name: str) -> str:
+        if crm_id and nmls_id:
+            return "Yes" if crm_id == nmls_id else "No"
+        if location_name and attendee_name:
+            score = jaro_winkler_similarity(attendee_name, location_name)
+            return "Yes" if score >= COMPANY_THRESHOLD else "No"
+        return ""
+
+    out["Company Match"] = [
+        compare_row(c, n, a, l)
+        for c, n, a, l in zip(crm_company_nmls, nmls_company_nmls, attendee_company_name, nmls_location_name)
+    ]
     return out
