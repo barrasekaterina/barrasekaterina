@@ -3,125 +3,178 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
 <title>New Lead Assigned — Find Mortgage Broker</title>
 </head>
-<body style="margin:0; padding:0; background-color:#f4f5f7; font-family:Arial, Helvetica, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7; padding:24px 0;">
+<body style="margin:0; padding:0; background-color:#eef1f5; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+
+  <!-- Preheader (hidden, shows in inbox preview) -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">
+    A new borrower lead has been assigned to you — reach out while their interest is fresh.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eef1f5;">
     <tr>
-      <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; max-width:600px;">
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px;">
 
-          <!-- Header -->
+          <!-- Logo lockup, outside the card -->
           <tr>
-            <td style="background-color:#0b2545; padding:24px 32px; text-align:center;">
-              <span style="color:#ffffff; font-size:20px; font-weight:bold; letter-spacing:0.5px;">Find Mortgage Broker</span><br>
-              <span style="color:#9fb3c8; font-size:12px;">Powered by AD Mortgage</span>
+            <td align="center" style="padding:0 24px 24px 24px;">
+              <span style="display:inline-block; width:28px; height:28px; background-color:#111827; border-radius:7px; vertical-align:middle; line-height:28px; text-align:center; color:#ffffff; font-size:13px; font-weight:700;">FM</span>
+              <span style="display:inline-block; vertical-align:middle; margin-left:10px; color:#111827; font-size:15px; font-weight:600; letter-spacing:-0.2px;">Find Mortgage Broker</span>
             </td>
           </tr>
 
-          <!-- Intro -->
+          <!-- Card -->
           <tr>
-            <td style="padding:32px 32px 8px 32px; color:#1c1c1c; font-size:15px; line-height:1.6;">
-              Hi {{Broker First Name}},
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:8px 32px 24px 32px; color:#1c1c1c; font-size:15px; line-height:1.6;">
-              A new borrower just reached out through Find Mortgage Broker, and this lead is now yours.
-            </td>
-          </tr>
+            <td style="background-color:#ffffff; border:1px solid #e6e8eb; border-radius:12px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 
-          <!-- Borrower Details -->
-          <tr>
-            <td style="padding:0 32px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f7f9fc; border:1px solid #e3e8ef; border-radius:6px;">
+                <!-- Eyebrow / status -->
                 <tr>
-                  <td style="padding:16px 20px;">
-                    <p style="margin:0 0 12px 0; color:#0b2545; font-size:14px; font-weight:bold; text-transform:uppercase; letter-spacing:0.4px;">Borrower Details</p>
-                    <p style="margin:0 0 8px 0; color:#1c1c1c; font-size:14px;"><strong>Name:</strong> {{First Name}} {{Middle Name}} {{Last Name}} {{Suffix}}</p>
-                    <p style="margin:0 0 8px 0; color:#1c1c1c; font-size:14px;"><strong>Email:</strong> {{Email Address}}</p>
-                    <p style="margin:0; color:#1c1c1c; font-size:14px;"><strong>Phone:</strong> {{Phone Number}}</p>
+                  <td style="padding:40px 40px 0 40px;">
+                    <span style="display:inline-block; background-color:#ecfdf3; color:#027a48; font-size:12px; font-weight:600; letter-spacing:0.2px; padding:4px 10px; border-radius:100px;">New lead assigned</span>
                   </td>
                 </tr>
+
+                <!-- Heading -->
+                <tr>
+                  <td style="padding:16px 40px 0 40px;">
+                    <p style="margin:0; color:#0d1117; font-size:20px; font-weight:700; letter-spacing:-0.3px; line-height:1.4;">Hi {{Broker First Name}}, you've got a new borrower</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 40px 32px 40px;">
+                    <p style="margin:0; color:#57606a; font-size:15px; line-height:1.6;">A new borrower just reached out through Find Mortgage Broker, and this lead is now yours.</p>
+                  </td>
+                </tr>
+
+                <!-- Divider -->
+                <tr>
+                  <td style="padding:0 40px;"><div style="border-top:1px solid #eef0f2;"></div></td>
+                </tr>
+
+                <!-- Borrower Details -->
+                <tr>
+                  <td style="padding:28px 40px 0 40px;">
+                    <p style="margin:0 0 16px 0; color:#0d1117; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">Borrower details</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:0 0 12px 0; color:#8b949e; font-size:13px; width:90px; vertical-align:top;">Name</td>
+                        <td style="padding:0 0 12px 0; color:#0d1117; font-size:14px; font-weight:500; vertical-align:top;">{{First Name}} {{Middle Name}} {{Last Name}} {{Suffix}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0 0 12px 0; color:#8b949e; font-size:13px; width:90px; vertical-align:top;">Email</td>
+                        <td style="padding:0 0 12px 0; color:#0d1117; font-size:14px; font-weight:500; vertical-align:top;"><a href="mailto:{{Email Address}}" style="color:#0d1117; text-decoration:none;">{{Email Address}}</a></td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0; color:#8b949e; font-size:13px; width:90px; vertical-align:top;">Phone</td>
+                        <td style="padding:0; color:#0d1117; font-size:14px; font-weight:500; vertical-align:top;"><a href="tel:{{Phone Number}}" style="color:#0d1117; text-decoration:none;">{{Phone Number}}</a></td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Optional Message -->
+                {{#if Message}}
+                <tr>
+                  <td style="padding:24px 40px 0 40px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8f9fb; border-radius:8px;">
+                      <tr>
+                        <td style="border-left:3px solid #2563eb; padding:14px 18px; border-radius:0 8px 8px 0;">
+                          <p style="margin:0 0 6px 0; color:#8b949e; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Message from the borrower</p>
+                          <p style="margin:0; color:#24292f; font-size:14px; line-height:1.6;">"{{Message}}"</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                {{/if}}
+
+                <!-- CTA -->
+                <tr>
+                  <td style="padding:32px 40px 0 40px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                          <a href="{{Task Link}}" target="_blank" style="display:block; padding:14px 24px; color:#ffffff; font-size:15px; font-weight:600; text-decoration:none; text-align:center;">Go to the task &rarr;</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:12px 0 0 0; color:#8b949e; font-size:13px; text-align:center;">Review the details, then reach out while their interest is still fresh.</p>
+                  </td>
+                </tr>
+
+                <!-- Divider -->
+                <tr>
+                  <td style="padding:32px 40px 0 40px;"><div style="border-top:1px solid #eef0f2;"></div></td>
+                </tr>
+
+                <!-- Tips -->
+                <tr>
+                  <td style="padding:28px 40px 40px 40px;">
+                    <p style="margin:0 0 16px 0; color:#0d1117; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">A few tips to win the lead</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:0 0 16px 0; vertical-align:top; width:24px;">
+                          <span style="display:inline-block; width:20px; height:20px; background-color:#eff6ff; color:#2563eb; font-size:11px; font-weight:700; border-radius:50%; text-align:center; line-height:20px;">1</span>
+                        </td>
+                        <td style="padding:0 0 16px 0; vertical-align:top; color:#57606a; font-size:14px; line-height:1.6;"><strong style="color:#0d1117;">Move fast.</strong> Borrowers respond best when you reach them quickly, and being first often makes the difference between a conversation and a missed opportunity.</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0 0 16px 0; vertical-align:top; width:24px;">
+                          <span style="display:inline-block; width:20px; height:20px; background-color:#eff6ff; color:#2563eb; font-size:11px; font-weight:700; border-radius:50%; text-align:center; line-height:20px;">2</span>
+                        </td>
+                        <td style="padding:0 0 16px 0; vertical-align:top; color:#57606a; font-size:14px; line-height:1.6;"><strong style="color:#0d1117;">Keep good records.</strong> Update the lead card and log notes after each contact, so nothing gets lost and every follow-up builds on the last.</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0 0 16px 0; vertical-align:top; width:24px;">
+                          <span style="display:inline-block; width:20px; height:20px; background-color:#eff6ff; color:#2563eb; font-size:11px; font-weight:700; border-radius:50%; text-align:center; line-height:20px;">3</span>
+                        </td>
+                        <td style="padding:0 0 16px 0; vertical-align:top; color:#57606a; font-size:14px; line-height:1.6;"><strong style="color:#0d1117;">Close the loop.</strong> Once you've connected, close the task and move the lead to its next stage, so your pipeline always reflects reality.</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0; vertical-align:top; width:24px;">
+                          <span style="display:inline-block; width:20px; height:20px; background-color:#eff6ff; color:#2563eb; font-size:11px; font-weight:700; border-radius:50%; text-align:center; line-height:20px;">4</span>
+                        </td>
+                        <td style="padding:0; vertical-align:top; color:#57606a; font-size:14px; line-height:1.6;"><strong style="color:#0d1117;">Make it personal.</strong> Reference their message and ask about their goals, timeline, and budget from the very first hello.</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
               </table>
             </td>
           </tr>
 
-          <!-- Optional Message -->
-          {{#if Message}}
+          <!-- Sign-off, outside the card -->
           <tr>
-            <td style="padding:20px 32px 0 32px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fff9e8; border:1px solid #f0e0b0; border-radius:6px;">
-                <tr>
-                  <td style="padding:16px 20px;">
-                    <p style="margin:0 0 8px 0; color:#7a5c00; font-size:14px; font-weight:bold; text-transform:uppercase; letter-spacing:0.4px;">Message from the Borrower</p>
-                    <p style="margin:0; color:#4a3c00; font-size:14px; line-height:1.6; font-style:italic;">"{{Message}}"</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          {{/if}}
-
-          <!-- What to do next -->
-          <tr>
-            <td style="padding:28px 32px 0 32px; color:#1c1c1c; font-size:15px; line-height:1.6;">
-              <p style="margin:0 0 4px 0; font-weight:bold; color:#0b2545;">What to Do Next</p>
-              <p style="margin:0;">Review the details, then reach out by phone or email while their interest is still fresh.</p>
-            </td>
-          </tr>
-
-          <!-- CTA Button -->
-          <tr>
-            <td align="center" style="padding:24px 32px 32px 32px;">
-              <table role="presentation" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="background-color:#1a73e8; border-radius:6px;">
-                    <a href="{{Task Link}}" target="_blank" style="display:inline-block; padding:14px 32px; color:#ffffff; font-size:15px; font-weight:bold; text-decoration:none;">Go to the Task</a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Tips -->
-          <tr>
-            <td style="padding:0 32px 32px 32px; color:#1c1c1c; font-size:14px; line-height:1.6;">
-              <p style="margin:0 0 12px 0; font-weight:bold; color:#0b2545;">A Few Tips to Win the Lead</p>
-              <ul style="margin:0; padding-left:18px;">
-                <li style="margin-bottom:10px;"><strong>Move fast.</strong> Borrowers respond best when you reach them quickly, and being first often makes the difference between a conversation and a missed opportunity.</li>
-                <li style="margin-bottom:10px;"><strong>Keep good records.</strong> Update the lead card and log notes after each contact, so nothing gets lost and every follow up builds on the last.</li>
-                <li style="margin-bottom:10px;"><strong>Close the loop.</strong> Once you've connected, close the task and move the lead to its next stage, so your pipeline always reflects reality.</li>
-                <li style="margin-bottom:0;"><strong>Make it personal.</strong> Reference their message and ask about their goals, timeline, and budget from the very first hello.</li>
-              </ul>
-            </td>
-          </tr>
-
-          <!-- Sign-off -->
-          <tr>
-            <td style="padding:0 32px 32px 32px; color:#1c1c1c; font-size:15px; line-height:1.6;">
-              Wishing you a great conversation,<br>
-              <strong>Find Mortgage Broker</strong> | Powered by AD Mortgage
+            <td align="center" style="padding:28px 24px 0 24px;">
+              <p style="margin:0; color:#57606a; font-size:14px; line-height:1.6;">Wishing you a great conversation,<br><strong style="color:#0d1117;">Find Mortgage Broker</strong> · Powered by AD Mortgage</p>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background-color:#f7f9fc; border-top:1px solid #e3e8ef; padding:24px 32px; color:#6b7280; font-size:12px; line-height:1.7;">
-              <p style="margin:0 0 8px 0; font-weight:bold; color:#0b2545; font-size:13px;">Find Mortgage Broker</p>
-              <p style="margin:0 0 12px 0;">Powered by AD Mortgage</p>
+            <td align="center" style="padding:32px 24px 0 24px; color:#8b949e; font-size:12px; line-height:1.7;">
               <p style="margin:0 0 12px 0;">You are receiving this notification because you are a registered broker on Find Mortgage Broker and a borrower has submitted a request through our platform.</p>
-              <p style="margin:0 0 12px 0;">Questions or need assistance? Contact Support: <a href="mailto:findmortgagebroker@admortgage.com" style="color:#1a73e8; text-decoration:none;">findmortgagebroker@admortgage.com</a></p>
-              <p style="margin:0 0 12px 0;">
-                <a href="https://leadercrm.admortgage.com/policy/#privacy" style="color:#1a73e8; text-decoration:none;">Privacy Policy</a> |
-                <a href="https://leadercrm.admortgage.com/policy/#terms" style="color:#1a73e8; text-decoration:none;">Terms and Conditions</a> |
-                Privacy Choices Request |
-                Licensing Disclosures |
-                <a href="https://leadercrm.admortgage.com/policy/#rules" style="color:#1a73e8; text-decoration:none;">General Rules</a>
+              <p style="margin:0 0 12px 0;">Questions or need assistance? Contact support at <a href="mailto:findmortgagebroker@admortgage.com" style="color:#2563eb; text-decoration:none;">findmortgagebroker@admortgage.com</a></p>
+              <p style="margin:0 0 16px 0;">
+                <a href="https://leadercrm.admortgage.com/policy/#privacy" style="color:#57606a; text-decoration:none;">Privacy Policy</a>
+                &nbsp;&middot;&nbsp;
+                <a href="https://leadercrm.admortgage.com/policy/#terms" style="color:#57606a; text-decoration:none;">Terms and Conditions</a>
+                &nbsp;&middot;&nbsp;
+                <span>Privacy Choices Request</span>
+                &nbsp;&middot;&nbsp;
+                <span>Licensing Disclosures</span>
+                &nbsp;&middot;&nbsp;
+                <a href="https://leadercrm.admortgage.com/policy/#rules" style="color:#57606a; text-decoration:none;">General Rules</a>
               </p>
               <p style="margin:0 0 4px 0;">&copy; {{Year}} Find Mortgage Broker. All rights reserved.</p>
-              <p style="margin:0;">899 W Cypress Creek Rd, Fort Lauderdale, FL 33309 &nbsp;&mdash;&nbsp; NMLS # 958660 &mdash; NMLS Consumer Access</p>
-              <p style="margin:8px 0 0 0;">2026 &copy; A&amp;D Mortgage LLC</p>
+              <p style="margin:0 0 4px 0;">899 W Cypress Creek Rd, Fort Lauderdale, FL 33309 &nbsp;&middot;&nbsp; NMLS # 958660 &middot; NMLS Consumer Access</p>
+              <p style="margin:12px 0 0 0;">2026 &copy; A&amp;D Mortgage LLC</p>
             </td>
           </tr>
 
