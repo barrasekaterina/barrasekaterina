@@ -6,7 +6,7 @@
   const JOB_TITLE_CATEGORIES = {
     "Owner/ CEO/ President": ["owner", "ceo", "president", "co-founder", "cofounder", "managing partner", "founder"],
     "Managing Broker": ["broker"],
-    "Top Manager": ["coo", "director", "vp", "svp", "vice", "managing member", "team leader", "cfo"],
+    "Top Manager": ["coo", "director", "vp", "evp", "avp", "svp", "vice", "managing member", "team leader", "cfo"],
     "Branch Manager": ["branch manager", "regional manager", "branch mgr"],
     Processor: ["processor"],
     "Account Executive": [
@@ -38,10 +38,21 @@
     "netzero", "juno",
   ];
 
+  function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  // Requires a word boundary before each keyword, not a raw substring
+  // check - a plain .includes() lets short keywords like "lo" match
+  // inside unrelated words ("Unemployed", "Head of Business Development"
+  // both contain "lo" mid-word, e.g. deve-LO-pment) and misclassify them.
+  // No boundary is required *after* the keyword, so intentional prefix
+  // matches keep working ("event" still matches "Events", "lo" still
+  // matches "Loan Officer" since that "lo" starts a word).
   function categorizeJobTitle(title) {
     const t = (title || "").toLowerCase();
     for (const [category, keywords] of Object.entries(JOB_TITLE_CATEGORIES)) {
-      if (keywords.some((kw) => t.includes(kw))) return category;
+      if (keywords.some((kw) => new RegExp(`\\b${escapeRegExp(kw)}`).test(t))) return category;
     }
     return "Other";
   }

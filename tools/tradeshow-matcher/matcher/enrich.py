@@ -20,8 +20,8 @@ JOB_TITLE_CATEGORIES: dict[str, list[str]] = {
     ],
     "Managing Broker": ["broker"],
     "Top Manager": [
-        "coo", "director", "vp", "svp", "vice", "managing member",
-        "team leader", "cfo",
+        "coo", "director", "vp", "evp", "avp", "svp", "vice",
+        "managing member", "team leader", "cfo",
     ],
     "Branch Manager": ["branch manager", "regional manager", "branch mgr"],
     "Processor": ["processor"],
@@ -54,10 +54,17 @@ PERSONAL_EMAIL_DOMAINS = [
 
 
 def categorize_job_title(title: str) -> str:
+    """Require a word boundary before each keyword (not a raw substring
+    check) - a plain "in" check lets short keywords like "lo" match inside
+    unrelated words ("Unemployed", "Head of Business Development" both
+    contain "lo" mid-word, e.g. deve-LO-pment) and misclassify them. No
+    boundary is required *after* the keyword, so intentional prefix
+    matches keep working ("event" still matches "Events", "lo" still
+    matches "Loan Officer" since that "lo" starts a word)."""
     title = str(title).lower()
     for category, keywords in JOB_TITLE_CATEGORIES.items():
         for keyword in keywords:
-            if keyword in title:
+            if re.search(rf"\b{re.escape(keyword)}", title):
                 return category
     return "Other"
 
