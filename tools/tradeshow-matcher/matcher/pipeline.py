@@ -84,7 +84,6 @@ def run_pipeline(
     result["Contact CRM ID"] = ""
     result["Lead CRM ID"] = ""
     result["MLO NMLS"] = ""
-    result["Company NMLS"] = ""
 
     if agg_contacts is not None and not agg_contacts.empty:
         key = "Full Name_tradeshow"
@@ -100,9 +99,6 @@ def run_pipeline(
         if "MLO_NMLS" in agg_contacts.columns:
             nmls_map = dict(zip(agg_contacts[key], agg_contacts["MLO_NMLS"]))
             result["MLO NMLS"] = cleaning.safe_str_series(result["Full Name"].map(nmls_map))
-        if "Company_NMLS" in agg_contacts.columns:
-            company_nmls_map = dict(zip(agg_contacts[key], agg_contacts["Company_NMLS"]))
-            result["Company NMLS"] = cleaning.safe_str_series(result["Full Name"].map(company_nmls_map))
 
     if agg_leads is not None and not agg_leads.empty:
         key = "Full Name_tradeshow"
@@ -117,11 +113,6 @@ def run_pipeline(
             nmls_map = dict(zip(agg_leads[key], agg_leads["MLO_NMLS"]))
             lead_nmls = cleaning.safe_str_series(result["Full Name"].map(nmls_map))
             result["MLO NMLS"] = result["MLO NMLS"].where(result["MLO NMLS"] != "", lead_nmls)
-        if "Company_NMLS" in agg_leads.columns:
-            # Same contacts-win-first rule as MLO NMLS above.
-            company_nmls_map = dict(zip(agg_leads[key], agg_leads["Company_NMLS"]))
-            lead_company_nmls = cleaning.safe_str_series(result["Full Name"].map(company_nmls_map))
-            result["Company NMLS"] = result["Company NMLS"].where(result["Company NMLS"] != "", lead_company_nmls)
 
     crm_domains = enrich.crm_email_domains(crm_contacts) if crm_contacts is not None else set()
     result = enrich.enrich_and_score_status(
@@ -148,7 +139,7 @@ def run_pipeline(
         "Status", "Found in CRM", "Found in Contacts", "Found in Leads",
         "Full Name", "Company Name", "Phone", "Email", "Job Title",
         "Job_Category", "Banks and Credit Unions", "Duplicate", "New Contact",
-        "Contact CRM Link", "Lead CRM Link", "MLO NMLS", "Company NMLS",
+        "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
     ]
     display_cols = [c for c in display_cols if c in result.columns]
     other_cols = [c for c in result.columns if c not in display_cols]

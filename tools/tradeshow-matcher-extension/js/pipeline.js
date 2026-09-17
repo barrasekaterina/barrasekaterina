@@ -80,7 +80,6 @@
         "Contact CRM ID": cm ? cm.crm.ID || "" : "",
         "Lead CRM ID": lm ? lm.crm.ID || "" : "",
         "MLO NMLS": (cm && cm.crm.MLO_NMLS) || (lm && lm.crm.MLO_NMLS) || "",
-        "Company NMLS": (cm && cm.crm.Company_NMLS) || (lm && lm.crm.Company_NMLS) || "",
       };
     });
 
@@ -102,7 +101,7 @@
       "Status", "Found in CRM", "Found in Contacts", "Found in Leads",
       "Full Name", "Company Name", "Phone", "Email", "Job Title",
       "Job_Category", "Banks and Credit Unions", "Duplicate", "New Contact",
-      "Contact CRM Link", "Lead CRM Link", "MLO NMLS", "Company NMLS",
+      "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
       "NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName",
     ].filter((c) => c in (result[0] || {}));
 
@@ -134,53 +133,15 @@
         "NMLS RegulationType": match ? match.RegulationType || "" : "",
         "NMLS LicensingStatus": match ? match.LicensingStatus || "" : "",
         "NMLS LocationNMLSID": match ? match.LocationNMLSID || "" : "",
-        "NMLS OwningCompanyNMLSID": match ? match.OwningCompanyNMLSID || "" : "",
         "NMLS LocationName": match ? match.LocationName || "" : "",
       };
     });
     const displayCols = [...pipelineResult.displayCols];
-    [
-      "NMLS Match Method", "NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus",
-      "NMLS LocationNMLSID", "NMLS OwningCompanyNMLSID", "NMLS LocationName",
-    ].forEach((c) => {
+    ["NMLS Match Method", "NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName"].forEach((c) => {
       if (!displayCols.includes(c) && c in (table[0] || {})) displayCols.push(c);
     });
     return { ...pipelineResult, table, displayCols };
   }
 
-  // Flags whether the company on file matches what NMLS currently shows
-  // for that MLO, for every attendee that got any NMLS match at all -
-  // whether via a direct CRM-derived id or the name+company fallback.
-  // Mirrors matcher.nmls.compare_company_match's Python equivalent:
-  // compares Company NMLS ids first (exact) when both sides have one,
-  // otherwise falls back to a *fuzzy* Company Name comparison (never an
-  // exact string check) - an attendee with no CRM record still has their
-  // own typed Company Name to fuzzy-compare against NMLS's resolved name.
-  const COMPANY_MATCH_THRESHOLD = 0.85;
-
-  function compareCompanyMatch(pipelineResult) {
-    const table = pipelineResult.table.map((row) => {
-      if (!("NMLS OwningCompanyNMLSID" in row)) return { ...row, "Company Match": "" };
-
-      const crmId = String(row["Company NMLS"] || "");
-      const nmlsId = String(row["NMLS OwningCompanyNMLSID"] || "");
-      const locationName = String(row["NMLS LocationName"] || "").trim().toLowerCase();
-      const attendeeName = String(row["Company Name"] || "").trim().toLowerCase();
-
-      let companyMatch = "";
-      if (crmId && nmlsId) {
-        companyMatch = crmId === nmlsId ? "Yes" : "No";
-      } else if (locationName && attendeeName) {
-        companyMatch = Matching.jaroWinkler(attendeeName, locationName) >= COMPANY_MATCH_THRESHOLD ? "Yes" : "No";
-      }
-      return { ...row, "Company Match": companyMatch };
-    });
-    const displayCols = [...pipelineResult.displayCols];
-    if (!displayCols.includes("Company Match") && "Company Match" in (table[0] || {})) {
-      displayCols.push("Company Match");
-    }
-    return { ...pipelineResult, table, displayCols };
-  }
-
-  global.Pipeline = { runPipeline, mergeNmlsEnrichment, compareCompanyMatch };
+  global.Pipeline = { runPipeline, mergeNmlsEnrichment };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -33,9 +33,7 @@
   function renderPreview(table, displayCols) {
     const ordered = Export.orderedColumns(displayCols, table);
     const first10 = ordered.slice(0, 10);
-    const nmlsCols = ordered.filter(
-      (c) => (c.startsWith("NMLS ") || c === "Company Match") && !first10.includes(c)
-    );
+    const nmlsCols = ordered.filter((c) => c.startsWith("NMLS ") && !first10.includes(c));
     const cols = [...first10, ...nmlsCols];
     const head = document.getElementById("preview-head");
     head.innerHTML = cols.map((c) => `<th>${escapeHtml(c)}</th>`).join("");
@@ -181,7 +179,6 @@
         }
 
         result = Pipeline.mergeNmlsEnrichment(result, enrichment, "NMLS ID Used");
-        result = Pipeline.compareCompanyMatch(result);
       }
       lastResult = result;
 
