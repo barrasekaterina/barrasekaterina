@@ -41,5 +41,31 @@
     return postJson(`${backendUrl.replace(/\/$/, "")}/api/nmls`, { ids });
   }
 
-  global.DbClient = { fetchContactsLive, fetchLeadsLive, fetchNmlsEnrichmentLive };
+  // Counterpart to /api/nmls for attendees with no CRM match at all (so no
+  // MLO NMLS id to look up directly): fuzzy-matches Name+Company against
+  // NMLS itself. Returns {ids, enrichment} instead of just rows, since
+  // postJson's `rows || []` unwrapping doesn't fit this endpoint's shape.
+  async function fetchNmlsFallbackLive(backendUrl, { attendees }) {
+    const url = `${backendUrl.replace(/\/$/, "")}/api/nmls-fallback`;
+    let response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attendees }),
+      });
+    } catch (err) {
+      throw new Error(
+        `Could not reach ${url} - is the local matcher backend running? ` +
+          `(cd tools/tradeshow-matcher && python app.py) Details: ${err.message || err}`
+      );
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.error) {
+      throw new Error(data.error || `Request to ${url} failed (HTTP ${response.status}).`);
+    }
+    return { ids: data.ids || [], enrichment: data.enrichment || [] };
+  }
+
+  global.DbClient = { fetchContactsLive, fetchLeadsLive, fetchNmlsEnrichmentLive, fetchNmlsFallbackLive };
 })(typeof window !== "undefined" ? window : globalThis);

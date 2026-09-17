@@ -54,12 +54,12 @@ Integrated Auth, same "only queries what actually matched" scoping — see
 the Flask README's "NMLS enrichment" section for the full details and
 caveats.
 
-**Gap vs. the Flask version:** the Flask app also falls back to
-fuzzy-matching Name + Company Name against NMLS directly for attendees
-with *no* CRM match at all (see `matcher.nmls.match_individuals_by_name`
-and the "CRM" vs "Name+Company" `NMLS Match Method` column). That fallback
-isn't wired up here yet — this extension only enriches attendees that
-already have an MLO NMLS id from a CRM match.
+Same CRM-first priority as the Flask version too: if an attendee matched
+a CRM Contact/Lead, its MLO NMLS id is used directly. Only for attendees
+with *no* CRM match at all does this fall back to a second backend call
+(`/api/nmls-fallback`) that fuzzy-matches Name + Company Name against
+NMLS itself (`matcher.nmls.match_individuals_by_name`) - the `NMLS Match
+Method` column shows "CRM" or "Name+Company" per row accordingly.
 
 ## What's different from the Python/Flask version
 

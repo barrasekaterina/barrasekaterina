@@ -131,10 +131,54 @@
       });
 
       if (document.getElementById("enrich_nmls").checked) {
-        const mloIds = [...new Set(result.table.map((r) => r["MLO NMLS"]).filter(Boolean))];
-        showProgress(`Enriching ${mloIds.length} MLO NMLS id(s) from the local backend...`);
-        const enrichment = await DbClient.fetchNmlsEnrichmentLive(backendUrl, { ids: mloIds });
-        result = Pipeline.mergeNmlsEnrichment(result, enrichment);
+        // Priority: if an attendee matched a CRM Contact/Lead, use that
+        // record's MLO NMLS id directly - it's a known, unambiguous id.
+        // Only for attendees with no CRM match at all do we fall back to
+        // fuzzy name+company matching against NMLS itself. Mirrors the
+        // Flask app's /run handler.
+        result.table = result.table.map((row) => ({
+          ...row,
+          "NMLS ID Used": row["MLO NMLS"] || "",
+          "NMLS Match Method": row["MLO NMLS"] ? "CRM" : "",
+        }));
+
+        const crmIds = [...new Set(result.table.map((r) => r["NMLS ID Used"]).filter(Boolean))];
+        showProgress(`Enriching ${crmIds.length} MLO NMLS id(s) from CRM matches...`);
+        let enrichment = await DbClient.fetchNmlsEnrichmentLive(backendUrl, { ids: crmIds });
+
+        const needsFallback = [];
+        result.table.forEach((row, idx) => {
+          if (row["NMLS ID Used"] === "") {
+            needsFallback.push({
+              idx,
+              "First Name": row["First Name"] || "",
+              "Last Name": row["Last Name"] || "",
+              "Company Name": row["Company Name"] || "",
+            });
+          }
+        });
+
+        if (needsFallback.length) {
+          showProgress(
+            `Looking up ${needsFallback.length} attendee(s) with no CRM match by name+company similarity...`
+          );
+          const { ids: fallbackIds, enrichment: fallbackEnrichment } = await DbClient.fetchNmlsFallbackLive(
+            backendUrl,
+            { attendees: needsFallback.map(({ idx, ...a }) => a) }
+          );
+          needsFallback.forEach((a, i) => {
+            const id = fallbackIds[i] || "";
+            if (id) {
+              result.table[a.idx]["NMLS ID Used"] = id;
+              result.table[a.idx]["NMLS Match Method"] = "Name+Company";
+            }
+          });
+          const byId = new Map(enrichment.map((r) => [String(r.IndividualNMLSID), r]));
+          fallbackEnrichment.forEach((r) => byId.set(String(r.IndividualNMLSID), r));
+          enrichment = [...byId.values()];
+        }
+
+        result = Pipeline.mergeNmlsEnrichment(result, enrichment, "NMLS ID Used");
       }
       lastResult = result;
 

@@ -16,7 +16,7 @@ import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_file
 
 from matcher import db, loaders, nmls
-from matcher.cleaning import safe_str_frame
+from matcher.cleaning import safe_str_frame, safe_str_series
 from matcher.pipeline import run_pipeline, write_excel
 
 app = Flask(__name__)
@@ -211,6 +211,34 @@ def api_nmls():
         print(f"[matcher] (extension) NMLS enrichment failed: {exc}", flush=True)
         return jsonify(error=str(exc)), 500
     return jsonify(rows=safe_str_frame(enrichment).to_dict(orient="records"))
+
+
+@app.route("/api/nmls-fallback", methods=["POST", "OPTIONS"])
+def api_nmls_fallback():
+    """Extension-only counterpart to /run's needs_fallback branch: given
+    attendees with no CRM match at all (so no MLO NMLS id to look up
+    directly), fuzzy-match their Name+Company against NMLS itself."""
+    if request.method == "OPTIONS":
+        return "", 204
+
+    payload = request.get_json(silent=True) or {}
+    attendees = payload.get("attendees") or []
+    print(
+        f"[matcher] (extension) Looking up {len(attendees)} attendee(s) with no CRM match "
+        f"by name+company similarity...",
+        flush=True,
+    )
+    try:
+        df = pd.DataFrame(attendees, columns=["First Name", "Last Name", "Company Name"])
+        ids, enrichment = nmls.match_individuals_by_name(df)
+        print(f"[matcher] (extension) Found {int((ids != '').sum())} of them by name+company.", flush=True)
+    except Exception as exc:  # noqa: BLE001 - surface driver/connection errors to the caller
+        print(f"[matcher] (extension) NMLS name-fallback lookup failed: {exc}", flush=True)
+        return jsonify(error=str(exc)), 500
+    return jsonify(
+        ids=safe_str_series(ids).tolist(),
+        enrichment=safe_str_frame(enrichment).to_dict(orient="records"),
+    )
 
 
 @app.route("/download/<token>")

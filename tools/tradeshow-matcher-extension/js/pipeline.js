@@ -118,12 +118,15 @@
   }
 
   // Left-join NMLS enrichment rows (from DbClient.fetchNmlsEnrichmentLive)
-  // onto a pipeline result by MLO NMLS id. Mirrors matcher.nmls's Python
-  // equivalent. Returns an updated {table, displayCols}.
-  function mergeNmlsEnrichment(pipelineResult, enrichmentRows) {
+  // onto a pipeline result by the given id column - "MLO NMLS" (the direct
+  // CRM-derived id) by default, or "NMLS ID Used" once the caller has also
+  // resolved some rows through the name+company fallback. Mirrors
+  // matcher.nmls.merge_nmls_enrichment's Python equivalent. Returns an
+  // updated {table, displayCols}.
+  function mergeNmlsEnrichment(pipelineResult, enrichmentRows, idKey = "MLO NMLS") {
     const byId = new Map(enrichmentRows.map((r) => [String(r.IndividualNMLSID), r]));
     const table = pipelineResult.table.map((row) => {
-      const match = byId.get(String(row["MLO NMLS"] || ""));
+      const match = byId.get(String(row[idKey] || ""));
       return {
         ...row,
         "NMLS FullName": match ? match.FullName || "" : "",
@@ -134,8 +137,8 @@
       };
     });
     const displayCols = [...pipelineResult.displayCols];
-    ["NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName"].forEach((c) => {
-      if (!displayCols.includes(c)) displayCols.push(c);
+    ["NMLS Match Method", "NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName"].forEach((c) => {
+      if (!displayCols.includes(c) && c in (table[0] || {})) displayCols.push(c);
     });
     return { ...pipelineResult, table, displayCols };
   }
