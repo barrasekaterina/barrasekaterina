@@ -141,42 +141,32 @@ def enrich_and_score_status(
             return "Existing Lead"
         return "New Contact" if row.get("_company_known") else "New Lead"
 
+    # Status stays exactly one of the 4 categories above, nothing else
+    # mixed in - every other signal below goes into its own Tags column
+    # instead, so Status stays clean to filter/pivot on.
     df["Status"] = df.apply(base_status, axis=1)
 
-    def append_tag(row, condition, tag):
-        if condition(row):
-            return f"{row['Status']}; {tag}" if row["Status"] else tag
-        return row["Status"]
+    def build_tags(row) -> str:
+        tags = []
+        # Existing Contact wins the base status even when the same
+        # attendee also matched a Lead - flag that overlap rather than
+        # silently dropping the Lead match info (Found in Leads/Found in
+        # CRM still show it too, but this keeps it visible at a glance).
+        if row.get("is_contact_match") and row.get("is_lead_match"):
+            tags.append("Also a Lead")
+        if row.get("Job_Category") in ("Non-Relevant", "Account Executive"):
+            tags.append("Position")
+        if row.get("Banks and Credit Unions") == "Bank/CU":
+            tags.append("Bank/CU")
+        if row.get("Existing Domain") == "Existing Domain":
+            tags.append("Existing Domain")
+        if row.get("Existing Domain") == "personal_email":
+            tags.append("personal_email")
+        if row.get("Duplicate") == "Duplicate":
+            tags.append("Duplicate")
+        return "; ".join(tags)
 
-    # Existing Contact wins the base status even when the same attendee
-    # also matched a Lead - flag that overlap rather than silently
-    # dropping the Lead match info (Found in Leads/Found in CRM still
-    # show it too, but this keeps it visible on Status at a glance).
-    df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("is_contact_match") and row.get("is_lead_match"),
-                              "Also a Lead"),
-        axis=1,
-    )
-    df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("Job_Category") == "Non-Relevant", "Position"), axis=1
-    )
-    df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("Job_Category") == "Account Executive", "Position"), axis=1
-    )
-    df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("Banks and Credit Unions") == "Bank/CU", "Bank/CU"), axis=1
-    )
-    df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("Existing Domain") == "Existing Domain", "Existing Domain"),
-        axis=1,
-    )
-    df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("Existing Domain") == "personal_email", "personal_email"),
-        axis=1,
-    )
-    df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("Duplicate") == "Duplicate", "Duplicate"), axis=1
-    )
+    df["Tags"] = df.apply(build_tags, axis=1)
 
     df = df.drop(columns=["_company_known"])
     return df

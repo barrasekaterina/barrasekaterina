@@ -1,9 +1,11 @@
-"""Validates the redesigned Status/Match Confidence/Matched By logic:
+"""Validates the redesigned Status/Tags/Match Confidence/Matched By logic:
 
 Status is exactly one of Existing Contact / Existing Lead / New Contact /
-New Lead, with "Existing Contact" winning even when the same attendee also
-matched a Lead (flagged via an "Also a Lead" tag rather than silently
-dropped). New Contact vs New Lead is decided by matcher.matching.
+New Lead - nothing else mixed in. "Existing Contact" wins even when the
+same attendee also matched a Lead, flagged via an "Also a Lead" tag in
+the separate Tags column instead (which also carries Position/Bank-CU/
+Existing Domain/personal_email/Duplicate) rather than silently dropped.
+New Contact vs New Lead is decided by matcher.matching.
 find_known_companies: does this unmatched attendee's Company Name already
 exist anywhere among CRM Contacts + Leads combined?
 
@@ -54,16 +56,19 @@ result = run_pipeline(
     crm_leads_file=io.BytesIO(crm_leads_csv.encode()),
 )
 table = result.table.set_index("Full Name")
-print(table[["Status", "Match Confidence", "Matched By"]].to_string())
+print(table[["Status", "Tags", "Match Confidence", "Matched By"]].to_string())
 
-assert table.loc["john smith", "Status"] == "Existing Contact; Existing Domain"
+assert table.loc["john smith", "Status"] == "Existing Contact"
+assert table.loc["john smith", "Tags"] == "Existing Domain"
 assert table.loc["john smith", "Match Confidence"] == "High"
 assert "Phone" in table.loc["john smith", "Matched By"]
 
-assert table.loc["carla diaz", "Status"] == "Existing Contact; Also a Lead; Existing Domain"
+assert table.loc["carla diaz", "Status"] == "Existing Contact"
+assert table.loc["carla diaz", "Tags"] == "Also a Lead; Existing Domain"
 assert table.loc["carla diaz", "Match Confidence"] == "High"
 
 assert table.loc["brand person", "Status"] == "New Contact"
+assert table.loc["brand person", "Tags"] == ""
 assert table.loc["brand person", "Match Confidence"] == "Medium"
 assert table.loc["brand person", "Matched By"] == "Company (fuzzy)"
 

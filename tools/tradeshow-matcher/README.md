@@ -73,14 +73,15 @@ The tradeshow file can be `.csv` or `.xlsx` and just needs a name column —
 common header spellings (Name, Full Name, Company/Organization,
 Phone/Phone Number, Email/E-mail) are recognized automatically.
 
-## Status, Match Confidence and Matched By
+## Status, Tags, Match Confidence and Matched By
 
-`Status` is exactly one of:
+`Status` is exactly one of these 4 values, nothing else mixed in - clean
+to filter or pivot on:
 
 - **`Existing Contact`** — matched a CRM Contact. Wins even if the same
   attendee also matched a Lead - that overlap isn't dropped, it's flagged
-  with an `Also a Lead` tag stacked onto Status (`Found in Contacts` /
-  `Found in Leads` also show it independently).
+  with an `Also a Lead` tag in the separate `Tags` column below
+  (`Found in Contacts` / `Found in Leads` also show it independently).
 - **`Existing Lead`** — matched a CRM Lead, no Contact match.
 - **`New Contact`** — no personal match at all, but their Company Name
   already exists somewhere in CRM (blocked + fuzzy-matched against every
@@ -89,9 +90,11 @@ Phone/Phone Number, Email/E-mail) are recognized automatically.
 - **`New Lead`** — no personal match, and the company isn't in CRM either
   (or there was no Company Name to check at all).
 
-Other tags (`Duplicate`, `Bank/CU`, `Existing Domain`, `personal_email`,
-Job_Category-driven `Position`) still stack onto Status the same way they
-always did, e.g. `Existing Contact; Position; Duplicate`.
+`Tags` is a separate, semicolon-joined column carrying everything that
+used to stack onto the old combined Status string: `Also a Lead`,
+Job_Category-driven `Position`, `Bank/CU`, `Existing Domain`,
+`personal_email`, `Duplicate` - e.g. `Position; Duplicate`, or blank if
+none apply.
 
 `Match Confidence` grades *what kind* of evidence backs that Status
 conclusion, using the same rule for every category - not different logic
@@ -127,8 +130,9 @@ rather than a direct/mobile number.
 
 **Breaking change:** this replaced the old `Status` values (`Contact`,
 `Contact - Unchecked`, `Lead - Existing`, the old email-domain-based
-`New Contact` tag) - any existing Excel filter, pivot table, or saved view
-keyed on those exact strings will need updating.
+`New Contact` tag) and moved the old stacked tags out into their own
+`Tags` column - any existing Excel filter, pivot table, or saved view
+keyed on the old combined `Status` strings will need updating.
 
 ## NMLS enrichment
 

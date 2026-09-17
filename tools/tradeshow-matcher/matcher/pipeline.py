@@ -157,11 +157,11 @@ def run_pipeline(
     # out, Medium when only fuzzy text (Name/Company) did, Low when there
     # was no usable data to compare at all.
     def match_confidence(row) -> str:
-        base = str(row["Status"]).split(";")[0].strip()
-        if base in ("Existing Contact", "Existing Lead"):
+        status = row["Status"]
+        if status in ("Existing Contact", "Existing Lead"):
             fields = row["Matched Fields"]
             return "High" if ("Phone" in fields or "Email" in fields) else "Medium"
-        if base == "New Contact":
+        if status == "New Contact":
             return "Medium"
         # New Lead: High if we had a Company Name to actually check against
         # CRM and it genuinely didn't match anything; Low if there was no
@@ -169,10 +169,10 @@ def run_pipeline(
         return "High" if str(row.get("Company Name", "")).strip() else "Low"
 
     def matched_by(row) -> str:
-        base = str(row["Status"]).split(";")[0].strip()
-        if base in ("Existing Contact", "Existing Lead"):
+        status = row["Status"]
+        if status in ("Existing Contact", "Existing Lead"):
             return row["Matched Fields"]
-        if base == "New Contact":
+        if status == "New Contact":
             return "Company (fuzzy)"
         return ""
 
@@ -193,7 +193,7 @@ def run_pipeline(
     )
 
     display_cols = [
-        "Status", "Match Confidence", "Matched By",
+        "Status", "Tags", "Match Confidence", "Matched By",
         "Found in CRM", "Found in Contacts", "Found in Leads",
         "Full Name", "Company Name", "Phone", "Email", "Job Title",
         "Job_Category", "Banks and Credit Unions", "Duplicate", "Existing Domain",
@@ -208,8 +208,8 @@ def run_pipeline(
         "matched_contacts": int(result["is_contact_match"].sum()),
         "matched_leads": int(result["is_lead_match"].sum()),
         "duplicates": int((result["Duplicate"] == "Duplicate").sum()),
-        "new_contacts": int(result["Status"].str.split(";").str[0].str.strip().eq("New Contact").sum()),
-        "new_leads": int(result["Status"].str.split(";").str[0].str.strip().eq("New Lead").sum()),
+        "new_contacts": int(result["Status"].eq("New Contact").sum()),
+        "new_leads": int(result["Status"].eq("New Lead").sum()),
         "existing_domain_matches": int((result["Existing Domain"] == "Existing Domain").sum()),
         "personal_emails": int((result["Existing Domain"] == "personal_email").sum()),
     }
@@ -234,14 +234,20 @@ def write_excel(result: pd.DataFrame, out_path: str) -> None:
                 col = result.columns.get_loc("Lead CRM Link") + 1
                 sheet.cell(row=excel_row, column=col).hyperlink = row["Lead CRM Link"]
 
-        if "Status" in result.columns and len(result) > 0:
-            status_col_idx = result.columns.get_loc("Status")
+        # Status and Tags are colored independently - Status holds only
+        # the 4 clean categories, Tags holds everything else - so each
+        # cell is colored by whichever STATUS_COLORS key matches its own
+        # value, not a combined string.
+        for col_name in ("Status", "Tags"):
+            if col_name not in result.columns or len(result) == 0:
+                continue
+            col_idx = result.columns.get_loc(col_name)
             for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
-                status_value = str(row[status_col_idx].value or "")
-                tags = [t.strip() for t in status_value.split(";")]
+                cell_value = str(row[col_idx].value or "")
+                tags = [t.strip() for t in cell_value.split(";")]
                 for tag, color in STATUS_COLORS.items():
-                    if tag in tags or status_value == tag:
-                        row[status_col_idx].fill = PatternFill(
+                    if tag in tags:
+                        row[col_idx].fill = PatternFill(
                             start_color=color, end_color=color, fill_type="solid"
                         )
                         break

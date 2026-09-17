@@ -126,14 +126,13 @@
     // out, Medium when only fuzzy text (Name/Company) did, Low when
     // there was no usable data to compare at all.
     result = result.map((row) => {
-      const base = row.Status.split(";")[0].trim();
       let confidence = "";
       let matchedBy = "";
-      if (base === "Existing Contact" || base === "Existing Lead") {
+      if (row.Status === "Existing Contact" || row.Status === "Existing Lead") {
         const fields = row["Matched Fields"];
         confidence = fields.includes("Phone") || fields.includes("Email") ? "High" : "Medium";
         matchedBy = fields;
-      } else if (base === "New Contact") {
+      } else if (row.Status === "New Contact") {
         confidence = "Medium";
         matchedBy = "Company (fuzzy)";
       } else {
@@ -147,7 +146,7 @@
     });
 
     const displayCols = [
-      "Status", "Match Confidence", "Matched By",
+      "Status", "Tags", "Match Confidence", "Matched By",
       "Found in CRM", "Found in Contacts", "Found in Leads",
       "Full Name", "Company Name", "Phone", "Email", "Job Title",
       "Job_Category", "Banks and Credit Unions", "Duplicate", "Existing Domain",
@@ -160,8 +159,8 @@
       matchedContacts: result.filter((r) => r.isContactMatch).length,
       matchedLeads: result.filter((r) => r.isLeadMatch).length,
       duplicates: result.filter((r) => r.Duplicate === "Duplicate").length,
-      newContacts: result.filter((r) => r.Status.split(";")[0].trim() === "New Contact").length,
-      newLeads: result.filter((r) => r.Status.split(";")[0].trim() === "New Lead").length,
+      newContacts: result.filter((r) => r.Status === "New Contact").length,
+      newLeads: result.filter((r) => r.Status === "New Lead").length,
       existingDomainMatches: result.filter((r) => r["Existing Domain"] === "Existing Domain").length,
       personalEmails: result.filter((r) => r["Existing Domain"] === "personal_email").length,
     };

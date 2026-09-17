@@ -108,27 +108,30 @@
       const domain = out.Email ? (/@([^.]+)/.exec(out.Email.toLowerCase()) || [])[1] : null;
       out["Existing Domain"] = domain ? assignDomainFlag(domain, crmContactsDomains) : "";
 
-      let status;
+      // Status stays exactly one of the 4 categories below, nothing else
+      // mixed in - every other signal goes into its own Tags field
+      // instead, so Status stays clean to filter/pivot on.
       if (out.isContactMatch) {
-        status = "Existing Contact";
+        out.Status = "Existing Contact";
       } else if (out.isLeadMatch) {
-        status = "Existing Lead";
+        out.Status = "Existing Lead";
       } else {
-        status = companyKnown.has(idx) ? "New Contact" : "New Lead";
+        out.Status = companyKnown.has(idx) ? "New Contact" : "New Lead";
       }
 
+      let tags = "";
       // Existing Contact wins the base status even when the same
       // attendee also matched a Lead - flag that overlap rather than
       // silently dropping the Lead match info.
-      if (out.isContactMatch && out.isLeadMatch) status = appendTag(status, "Also a Lead");
-      if (out.Job_Category === "Non-Relevant") status = appendTag(status, "Position");
-      if (out.Job_Category === "Account Executive") status = appendTag(status, "Position");
-      if (out["Banks and Credit Unions"] === "Bank/CU") status = appendTag(status, "Bank/CU");
-      if (out["Existing Domain"] === "Existing Domain") status = appendTag(status, "Existing Domain");
-      if (out["Existing Domain"] === "personal_email") status = appendTag(status, "personal_email");
-      if (out.Duplicate === "Duplicate") status = appendTag(status, "Duplicate");
+      if (out.isContactMatch && out.isLeadMatch) tags = appendTag(tags, "Also a Lead");
+      if (out.Job_Category === "Non-Relevant") tags = appendTag(tags, "Position");
+      if (out.Job_Category === "Account Executive") tags = appendTag(tags, "Position");
+      if (out["Banks and Credit Unions"] === "Bank/CU") tags = appendTag(tags, "Bank/CU");
+      if (out["Existing Domain"] === "Existing Domain") tags = appendTag(tags, "Existing Domain");
+      if (out["Existing Domain"] === "personal_email") tags = appendTag(tags, "personal_email");
+      if (out.Duplicate === "Duplicate") tags = appendTag(tags, "Duplicate");
+      out.Tags = tags;
 
-      out.Status = status;
       return out;
     });
   }
