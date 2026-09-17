@@ -9,6 +9,20 @@ Like the Python version, this auto-detects whether your tradeshow file has
 Full Name + Email, + Company Name, + Phone, or all of them, and matches
 accordingly. There is no business-card (BC) input or matching path.
 
+## Status, Match Confidence and Matched By
+
+Works identically to the Flask version - see its README's "Status, Match
+Confidence and Matched By" section for the full design and rationale.
+Short version: `Status` is `Existing Contact` (wins even over a Lead
+match, flagged via an `Also a Lead` tag), `Existing Lead`, `New Contact`
+(no personal match, but the company already exists in CRM), or `New
+Lead` (company not in CRM either) - plus the same stacked tags as
+before (`Duplicate`, `Bank/CU`, `Existing Domain`, `personal_email`,
+`Position`). `Match Confidence` (`High`/`Medium`/`Low`) and `Matched By`
+apply the same one rule across every category: High for an exact/near
+-exact identifier (Phone/Email), Medium for fuzzy text only
+(Name/Company), Low for no usable data at all.
+
 ## Install (unpacked, for personal/local use)
 
 1. Open `chrome://extensions` (or `edge://extensions`).

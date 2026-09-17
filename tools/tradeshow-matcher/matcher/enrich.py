@@ -84,7 +84,7 @@ def assign_domain_flag(email_domain: str, crm_domains: set[str]) -> str:
     if any(personal in email_domain for personal in PERSONAL_EMAIL_DOMAINS):
         return "personal_email"
     if email_domain in crm_domains:
-        return "New Contact"
+        return "Existing Domain"
     return ""
 
 
@@ -96,12 +96,18 @@ def crm_email_domains(crm_df: pd.DataFrame) -> set[str]:
 
 def enrich_and_score_status(
     merged: pd.DataFrame,
-    has_contacts: bool,
-    has_leads: bool,
     crm_contacts_domains: set[str],
+    company_known: pd.Series,
 ) -> pd.DataFrame:
-    """Attach Job_Category, Banks and Credit Unions, Duplicate, New Contact /
-    personal_email, and the composite Status column."""
+    """Attach Job_Category, Banks and Credit Unions, Duplicate, Existing
+    Domain / personal_email, and the composite Status column.
+
+    `company_known` is a boolean Series (aligned to `merged`.index) saying
+    whether an attendee's Company Name was found among every company seen
+    in CRM Contacts + Leads combined (matcher.matching.find_known_companies)
+    - only meaningful for attendees with no CRM Contact/Lead match at all;
+    it's what tells New Contact (known company, new person) apart from
+    New Lead (company not in CRM either)."""
     df = merged.copy()
 
     if "Job Title" in df.columns:
@@ -120,18 +126,20 @@ def enrich_and_score_status(
 
     if "Email" in df.columns:
         df["domain_tradeshow"] = safe_str_series(df["Email"]).str.lower().str.extract(r"@([^.]+)")[0]
-        df["New Contact"] = df["domain_tradeshow"].apply(
+        df["Existing Domain"] = df["domain_tradeshow"].apply(
             lambda d: assign_domain_flag(d, crm_contacts_domains)
         )
     else:
-        df["New Contact"] = ""
+        df["Existing Domain"] = ""
+
+    df["_company_known"] = company_known.reindex(df.index, fill_value=False)
 
     def base_status(row) -> str:
-        if has_contacts and row.get("is_contact_match"):
-            return "Contact" if row.get("contact_full_match") else "Contact - Unchecked"
-        if has_leads and row.get("is_lead_match"):
-            return "Lead - Existing"
-        return ""
+        if row.get("is_contact_match"):
+            return "Existing Contact"
+        if row.get("is_lead_match"):
+            return "Existing Lead"
+        return "New Contact" if row.get("_company_known") else "New Lead"
 
     df["Status"] = df.apply(base_status, axis=1)
 
@@ -140,6 +148,15 @@ def enrich_and_score_status(
             return f"{row['Status']}; {tag}" if row["Status"] else tag
         return row["Status"]
 
+    # Existing Contact wins the base status even when the same attendee
+    # also matched a Lead - flag that overlap rather than silently
+    # dropping the Lead match info (Found in Leads/Found in CRM still
+    # show it too, but this keeps it visible on Status at a glance).
+    df["Status"] = df.apply(
+        lambda r: append_tag(r, lambda row: row.get("is_contact_match") and row.get("is_lead_match"),
+                              "Also a Lead"),
+        axis=1,
+    )
     df["Status"] = df.apply(
         lambda r: append_tag(r, lambda row: row.get("Job_Category") == "Non-Relevant", "Position"), axis=1
     )
@@ -150,13 +167,16 @@ def enrich_and_score_status(
         lambda r: append_tag(r, lambda row: row.get("Banks and Credit Unions") == "Bank/CU", "Bank/CU"), axis=1
     )
     df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("New Contact") == "New Contact", "New Contact"), axis=1
+        lambda r: append_tag(r, lambda row: row.get("Existing Domain") == "Existing Domain", "Existing Domain"),
+        axis=1,
     )
     df["Status"] = df.apply(
-        lambda r: append_tag(r, lambda row: row.get("New Contact") == "personal_email", "personal_email"), axis=1
+        lambda r: append_tag(r, lambda row: row.get("Existing Domain") == "personal_email", "personal_email"),
+        axis=1,
     )
     df["Status"] = df.apply(
         lambda r: append_tag(r, lambda row: row.get("Duplicate") == "Duplicate", "Duplicate"), axis=1
     )
 
+    df = df.drop(columns=["_company_known"])
     return df

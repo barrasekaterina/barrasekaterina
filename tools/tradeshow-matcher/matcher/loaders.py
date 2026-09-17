@@ -84,20 +84,25 @@ def load_tradeshow_file(file_obj, filename: str) -> tuple[pd.DataFrame, list[str
 
     detected = []
     for field in OPTIONAL_MATCH_FIELDS:
-        if field in df.columns and cleaning.safe_str_series(df[field]).str.strip().ne("").any():
-            detected.append(field)
-        elif field not in df.columns:
+        if field not in df.columns:
             df[field] = ""
+            continue
+        # Normalize to a blank-safe string regardless of whether the field
+        # ends up "detected" below - a column that's present but entirely
+        # blank (e.g. a Company Name header with no values filled in)
+        # would otherwise be left as raw NaN, and str(nan) is the
+        # non-empty string "nan", not "".
+        df[field] = cleaning.safe_str_series(df[field]).str.strip()
+        if (df[field] != "").any():
+            detected.append(field)
 
     if "Email" in detected:
-        df["Email"] = df["Email"].astype(str).str.strip().str.lower()
+        df["Email"] = df["Email"].str.lower()
     if "Phone" in detected:
-        df["Extension"] = cleaning.extract_extension(df["Phone"].astype(str))
+        df["Extension"] = cleaning.extract_extension(df["Phone"])
         df["Phone"] = cleaning.clean_phone_series(df["Phone"])
     else:
         df["Extension"] = ""
-    if "Company Name" in detected:
-        df["Company Name"] = df["Company Name"].astype(str).str.strip()
 
     if "Job Title" not in df.columns:
         df["Job Title"] = ""

@@ -77,7 +77,7 @@
   function assignDomainFlag(domain, crmDomains) {
     if (!domain) return "";
     if (PERSONAL_EMAIL_DOMAINS.some((p) => domain.includes(p))) return "personal_email";
-    if (crmDomains.has(domain)) return "New Contact";
+    if (crmDomains.has(domain)) return "Existing Domain";
     return "";
   }
 
@@ -87,34 +87,45 @@
 
   // rows: array of standardized tradeshow rows, already annotated with
   // isContactMatch / contactFullMatch / isLeadMatch by pipeline.js.
-  function enrichAndScoreStatus(rows, hasContacts, hasLeads, crmContactsDomains) {
+  // companyKnown: a Set of row indices (into `rows`) whose Company Name
+  // was found among every company seen in CRM Contacts + Leads combined
+  // (Matching.findKnownCompanies) - only meaningful for attendees with no
+  // CRM Contact/Lead match; it's what tells New Contact (known company,
+  // new person) apart from New Lead (company not in CRM either).
+  function enrichAndScoreStatus(rows, crmContactsDomains, companyKnown) {
     const nameCounts = new Map();
     rows.forEach((r) => {
       const key = r["Full Name"];
       nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
     });
 
-    return rows.map((row) => {
+    return rows.map((row, idx) => {
       const out = { ...row };
       out.Job_Category = out["Job Title"] ? categorizeJobTitle(out["Job Title"]) : "";
       out["Banks and Credit Unions"] = out["Company Name"] ? labelBankCreditUnion(out["Company Name"]) : null;
       out.Duplicate = nameCounts.get(out["Full Name"]) > 1 ? "Duplicate" : null;
 
       const domain = out.Email ? (/@([^.]+)/.exec(out.Email.toLowerCase()) || [])[1] : null;
-      out["New Contact"] = domain ? assignDomainFlag(domain, crmContactsDomains) : "";
+      out["Existing Domain"] = domain ? assignDomainFlag(domain, crmContactsDomains) : "";
 
-      let status = "";
-      if (hasContacts && out.isContactMatch) {
-        status = out.contactFullMatch ? "Contact" : "Contact - Unchecked";
-      } else if (hasLeads && out.isLeadMatch) {
-        status = "Lead - Existing";
+      let status;
+      if (out.isContactMatch) {
+        status = "Existing Contact";
+      } else if (out.isLeadMatch) {
+        status = "Existing Lead";
+      } else {
+        status = companyKnown.has(idx) ? "New Contact" : "New Lead";
       }
 
+      // Existing Contact wins the base status even when the same
+      // attendee also matched a Lead - flag that overlap rather than
+      // silently dropping the Lead match info.
+      if (out.isContactMatch && out.isLeadMatch) status = appendTag(status, "Also a Lead");
       if (out.Job_Category === "Non-Relevant") status = appendTag(status, "Position");
       if (out.Job_Category === "Account Executive") status = appendTag(status, "Position");
       if (out["Banks and Credit Unions"] === "Bank/CU") status = appendTag(status, "Bank/CU");
-      if (out["New Contact"] === "New Contact") status = appendTag(status, "New Contact");
-      if (out["New Contact"] === "personal_email") status = appendTag(status, "personal_email");
+      if (out["Existing Domain"] === "Existing Domain") status = appendTag(status, "Existing Domain");
+      if (out["Existing Domain"] === "personal_email") status = appendTag(status, "personal_email");
       if (out.Duplicate === "Duplicate") status = appendTag(status, "Duplicate");
 
       out.Status = status;

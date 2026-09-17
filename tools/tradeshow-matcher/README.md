@@ -22,9 +22,11 @@ entirely.
    `recordlinkage` (Jaro-Winkler on name/company, exact-or-fuzzy on email,
    last-10-digit set intersection on phone), weighting each detected field
    equally.
-3. Flags each attendee as an existing **Contact**, existing **Lead**,
-   **Duplicate**, **New Contact**, or **personal_email**, and buckets job
-   titles (Owner/CEO, Loan Officer, Account Executive, ...).
+3. Flags each attendee's **Status** as **Existing Contact**, **Existing
+   Lead**, **New Contact**, or **New Lead** (see "Status, Match Confidence
+   and Matched By" below), plus tags for Duplicate/Bank-CU/Existing
+   Domain/personal_email, and buckets job titles (Owner/CEO, Loan Officer,
+   Account Executive, ...).
 4. Optionally looks up each matched attendee's MLO NMLS id in the NMLS
    database and adds their currently Authorized-to-Represent company or
    branch name (see "NMLS enrichment" below).
@@ -70,6 +72,63 @@ For each of Contacts and Leads you can either:
 The tradeshow file can be `.csv` or `.xlsx` and just needs a name column —
 common header spellings (Name, Full Name, Company/Organization,
 Phone/Phone Number, Email/E-mail) are recognized automatically.
+
+## Status, Match Confidence and Matched By
+
+`Status` is exactly one of:
+
+- **`Existing Contact`** — matched a CRM Contact. Wins even if the same
+  attendee also matched a Lead - that overlap isn't dropped, it's flagged
+  with an `Also a Lead` tag stacked onto Status (`Found in Contacts` /
+  `Found in Leads` also show it independently).
+- **`Existing Lead`** — matched a CRM Lead, no Contact match.
+- **`New Contact`** — no personal match at all, but their Company Name
+  already exists somewhere in CRM (blocked + fuzzy-matched against every
+  unique company across Contacts + Leads combined, `matcher.matching.
+  find_known_companies`) - a known account, just a new person there.
+- **`New Lead`** — no personal match, and the company isn't in CRM either
+  (or there was no Company Name to check at all).
+
+Other tags (`Duplicate`, `Bank/CU`, `Existing Domain`, `personal_email`,
+Job_Category-driven `Position`) still stack onto Status the same way they
+always did, e.g. `Existing Contact; Position; Duplicate`.
+
+`Match Confidence` grades *what kind* of evidence backs that Status
+conclusion, using the same rule for every category - not different logic
+per category:
+
+- **High** — an exact/near-exact identifier (Phone or Email) confirmed or
+  ruled it out.
+- **Medium** — only fuzzy text (Name and/or Company Name) did.
+- **Low** — there was no usable data to compare at all (e.g. `New Lead`
+  with a blank Company Name - "new" here just means "unverifiable," not
+  "confirmed new").
+
+`Matched By` lists which fields actually contributed (e.g. `Name, Phone`),
+or `Company (fuzzy)` for a `New Contact` company-existence match, or blank
+for `New Lead`.
+
+The `New Contact`/`New Lead` company-existence check deliberately uses a
+*stricter* similarity threshold (0.92) than the person-level company
+corroboration used elsewhere (0.85, see below) - at the scale of a full
+CRM export with potentially thousands of unique company names, a looser
+threshold risks false positives between genuinely different
+similarly-named companies, which would wrongly claim an existing
+relationship. It also uses `recordlinkage`'s blocking (same technique as
+the name-matching above) rather than comparing every unmatched attendee
+against every company individually, since that full cross-product would
+be far slower at real CRM data volumes.
+
+**Known limitation:** treating a Phone match as High confidence assumes
+the phone number is personal, not a shared office/switchboard line where
+multiple different employees could all "match" on the same number - worth
+keeping in mind if your CRM phone data tends to be a shared main line
+rather than a direct/mobile number.
+
+**Breaking change:** this replaced the old `Status` values (`Contact`,
+`Contact - Unchecked`, `Lead - Existing`, the old email-domain-based
+`New Contact` tag) - any existing Excel filter, pivot table, or saved view
+keyed on those exact strings will need updating.
 
 ## NMLS enrichment
 

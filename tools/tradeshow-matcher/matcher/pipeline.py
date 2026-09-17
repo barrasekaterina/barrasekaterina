@@ -17,12 +17,14 @@ from . import cleaning, enrich, loaders, matching
 
 STATUS_COLORS = {
     "Duplicate": "8A2BE2",
-    "Lead - Existing": "006400",
-    "Contact - Unchecked": "FFA500",
-    "Contact": "FFA500",
+    "Existing Lead": "006400",
+    "Existing Contact": "FFA500",
+    "New Lead": "DC143C",
+    "New Contact": "87CEFA",
+    "Also a Lead": "40E0D0",
     "Bank/CU": "FFC0CB",
     "Position": "FFFF00",
-    "New Contact": "87CEFA",
+    "Existing Domain": "ADD8E6",
 }
 
 CRM_CONTACT_URL = "https://crm.admortgage.com/crm/contact/details/{id}/"
@@ -84,6 +86,7 @@ def run_pipeline(
     result["Contact CRM ID"] = ""
     result["Lead CRM ID"] = ""
     result["MLO NMLS"] = ""
+    result["Matched Fields"] = ""
 
     if agg_contacts is not None and not agg_contacts.empty:
         key = "Full Name_tradeshow"
@@ -99,6 +102,9 @@ def run_pipeline(
         if "MLO_NMLS" in agg_contacts.columns:
             nmls_map = dict(zip(agg_contacts[key], agg_contacts["MLO_NMLS"]))
             result["MLO NMLS"] = cleaning.safe_str_series(result["Full Name"].map(nmls_map))
+        if "matched_fields" in agg_contacts.columns:
+            fields_map = dict(zip(agg_contacts[key], agg_contacts["matched_fields"]))
+            result["Matched Fields"] = cleaning.safe_str_series(result["Full Name"].map(fields_map))
 
     if agg_leads is not None and not agg_leads.empty:
         key = "Full Name_tradeshow"
@@ -113,14 +119,65 @@ def run_pipeline(
             nmls_map = dict(zip(agg_leads[key], agg_leads["MLO_NMLS"]))
             lead_nmls = cleaning.safe_str_series(result["Full Name"].map(nmls_map))
             result["MLO NMLS"] = result["MLO NMLS"].where(result["MLO NMLS"] != "", lead_nmls)
+        if "matched_fields" in agg_leads.columns:
+            # Same contacts-win-first rule as MLO NMLS above.
+            fields_map = dict(zip(agg_leads[key], agg_leads["matched_fields"]))
+            lead_fields = cleaning.safe_str_series(result["Full Name"].map(fields_map))
+            result["Matched Fields"] = result["Matched Fields"].where(result["Matched Fields"] != "", lead_fields)
+
+    # Attendees with no CRM Contact/Lead match at all still might work for
+    # an already-known company (a known account, just a new person there)
+    # rather than being a wholly new prospect - check their Company Name
+    # against every company seen across CRM Contacts + Leads combined.
+    known_companies = pd.concat(
+        [df[["Company Name"]] for df in (crm_contacts, crm_leads) if df is not None and "Company Name" in df.columns],
+        ignore_index=True,
+    ) if (crm_contacts is not None or crm_leads is not None) else pd.DataFrame(columns=["Company Name"])
+    known_companies = known_companies[
+        cleaning.safe_str_series(known_companies["Company Name"]).str.strip() != ""
+    ].drop_duplicates()
+
+    unmatched_mask = ~(result["is_contact_match"] | result["is_lead_match"])
+    company_known = pd.Series(False, index=result.index)
+    if unmatched_mask.any():
+        company_known.loc[unmatched_mask] = matching.find_known_companies(
+            result.loc[unmatched_mask, ["Company Name"]], known_companies
+        )
 
     crm_domains = enrich.crm_email_domains(crm_contacts) if crm_contacts is not None else set()
     result = enrich.enrich_and_score_status(
         result,
-        has_contacts=crm_contacts is not None,
-        has_leads=crm_leads is not None,
         crm_contacts_domains=crm_domains,
+        company_known=company_known,
     )
+
+    # Match Confidence grades *what kind* of evidence backs the Status
+    # conclusion, using one rule for every category: High when an
+    # exact/near-exact identifier (Phone or Email) confirmed or ruled it
+    # out, Medium when only fuzzy text (Name/Company) did, Low when there
+    # was no usable data to compare at all.
+    def match_confidence(row) -> str:
+        base = str(row["Status"]).split(";")[0].strip()
+        if base in ("Existing Contact", "Existing Lead"):
+            fields = row["Matched Fields"]
+            return "High" if ("Phone" in fields or "Email" in fields) else "Medium"
+        if base == "New Contact":
+            return "Medium"
+        # New Lead: High if we had a Company Name to actually check against
+        # CRM and it genuinely didn't match anything; Low if there was no
+        # Company Name at all, so "New Lead" here just means "unverifiable".
+        return "High" if str(row.get("Company Name", "")).strip() else "Low"
+
+    def matched_by(row) -> str:
+        base = str(row["Status"]).split(";")[0].strip()
+        if base in ("Existing Contact", "Existing Lead"):
+            return row["Matched Fields"]
+        if base == "New Contact":
+            return "Company (fuzzy)"
+        return ""
+
+    result["Match Confidence"] = result.apply(match_confidence, axis=1)
+    result["Matched By"] = result.apply(matched_by, axis=1)
 
     result["Contact CRM Link"] = result["Contact CRM ID"].apply(
         lambda i: CRM_CONTACT_URL.format(id=i) if i else ""
@@ -136,9 +193,10 @@ def run_pipeline(
     )
 
     display_cols = [
-        "Status", "Found in CRM", "Found in Contacts", "Found in Leads",
+        "Status", "Match Confidence", "Matched By",
+        "Found in CRM", "Found in Contacts", "Found in Leads",
         "Full Name", "Company Name", "Phone", "Email", "Job Title",
-        "Job_Category", "Banks and Credit Unions", "Duplicate", "New Contact",
+        "Job_Category", "Banks and Credit Unions", "Duplicate", "Existing Domain",
         "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
     ]
     display_cols = [c for c in display_cols if c in result.columns]
@@ -150,8 +208,10 @@ def run_pipeline(
         "matched_contacts": int(result["is_contact_match"].sum()),
         "matched_leads": int(result["is_lead_match"].sum()),
         "duplicates": int((result["Duplicate"] == "Duplicate").sum()),
-        "new_contacts": int((result["New Contact"] == "New Contact").sum()),
-        "personal_emails": int((result["New Contact"] == "personal_email").sum()),
+        "new_contacts": int(result["Status"].str.split(";").str[0].str.strip().eq("New Contact").sum()),
+        "new_leads": int(result["Status"].str.split(";").str[0].str.strip().eq("New Lead").sum()),
+        "existing_domain_matches": int((result["Existing Domain"] == "Existing Domain").sum()),
+        "personal_emails": int((result["Existing Domain"] == "personal_email").sum()),
     }
 
     return PipelineResult(detected_fields=detected_fields, table=result, summary=summary)

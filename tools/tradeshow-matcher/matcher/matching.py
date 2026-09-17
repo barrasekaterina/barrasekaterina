@@ -19,6 +19,24 @@ LAST_NAME_THRESHOLD = 0.85
 COMPANY_THRESHOLD = 0.85
 EMAIL_THRESHOLD = 0.95
 
+# Stricter than COMPANY_THRESHOLD above: that threshold corroborates a
+# specific person's identity (name already matched; company just adds
+# confidence), where a same-ish-sounding company is an acceptable risk.
+# This one instead answers "does this company already exist in CRM at
+# all" with no person-match backing it up - at the scale of a full CRM
+# export (thousands of unique companies), a looser threshold risks
+# false positives between genuinely different companies ("First Choice
+# Lending" vs "First Choice Mortgage"), wrongly implying an existing
+# relationship where none exists.
+NEW_CONTACT_COMPANY_THRESHOLD = 0.92
+
+FIELD_LABELS = {
+    "first_last_name_score": "Name",
+    "company_score": "Company",
+    "phone_score": "Phone",
+    "email_score": "Email",
+}
+
 
 def match_tradeshow_to_crm(tradeshow: pd.DataFrame, crm: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
     """Return one row per matched (tradeshow, crm) pair with score columns.
@@ -111,6 +129,16 @@ def match_tradeshow_to_crm(tradeshow: pd.DataFrame, crm: pd.DataFrame, fields: l
     }
     features["best_match_label"] = features["best_match"].map(labels)
 
+    # Every field that actually hit its max score, not just the single
+    # best one - e.g. "Name, Phone" - so callers can grade match
+    # confidence by which *kind* of evidence backed a match (an exact
+    # identifier like Phone/Email vs. fuzzy text like Name/Company alone).
+    def matched_fields_str(row) -> str:
+        hits = [FIELD_LABELS[c] for c in score_cols if round(row[c], 6) == round(weight, 6)]
+        return ", ".join(hits)
+
+    features["matched_fields"] = features.apply(matched_fields_str, axis=1)
+
     features = features.reset_index()
     features = features.rename(columns={"level_0": "tradeshow_index", "level_1": "crm_index"})
 
@@ -120,6 +148,54 @@ def match_tradeshow_to_crm(tradeshow: pd.DataFrame, crm: pd.DataFrame, fields: l
                              left_on="crm_index", right_index=True, suffixes=("_tradeshow", "_crm"))
     matched = matched.sort_values(by=["tradeshow_index", "total_score"], ascending=[True, False])
     return matched
+
+
+def find_known_companies(unmatched: pd.DataFrame, known_companies: pd.DataFrame) -> pd.Series:
+    """For attendees with no CRM Contact/Lead match at all, check whether
+    their Company Name already exists among every unique company seen in
+    CRM Contacts + Leads combined - i.e. is this a *known account*, even
+    though this particular person isn't in CRM yet?
+
+    `unmatched` needs a "Company Name" column (blank is fine - those rows
+    just can't be checked and come back False). `known_companies` needs a
+    "Company Name" column of every unique company name from CRM Contacts
+    and CRM Leads. Uses the same sortedneighbourhood blocking as the main
+    name-matching above rather than a full cross-product, since a real CRM
+    export can carry thousands of unique company names - comparing every
+    unmatched attendee against every one of them individually would be
+    far slower than blocking first.
+
+    Returns a boolean Series aligned to unmatched.index.
+    """
+    from .cleaning import safe_str_series
+
+    result = pd.Series(False, index=unmatched.index)
+    if known_companies.empty:
+        return result
+
+    unmatched = unmatched.copy()
+    known_companies = known_companies.copy()
+    unmatched["Company Name"] = safe_str_series(unmatched["Company Name"]).str.lower().str.strip()
+    known_companies["Company Name"] = safe_str_series(known_companies["Company Name"]).str.lower().str.strip()
+
+    has_company = unmatched["Company Name"] != ""
+    if not has_company.any():
+        return result
+    checkable = unmatched[has_company]
+
+    indexer = recordlinkage.Index()
+    indexer.sortedneighbourhood("Company Name")
+    candidate_links = indexer.index(checkable, known_companies)
+    if len(candidate_links) == 0:
+        return result
+
+    compare_cl = recordlinkage.Compare()
+    compare_cl.string("Company Name", "Company Name", method="jarowinkler",
+                       threshold=NEW_CONTACT_COMPANY_THRESHOLD, label="company")
+    features = compare_cl.compute(candidate_links, checkable, known_companies)
+    matched_idx = features[features["company"] > 0].index.get_level_values(0).unique()
+    result.loc[matched_idx] = True
+    return result
 
 
 def aggregate_matches(matched: pd.DataFrame, fields: list[str]) -> pd.DataFrame:

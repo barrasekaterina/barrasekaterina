@@ -80,13 +80,36 @@
         "Contact CRM ID": cm ? cm.crm.ID || "" : "",
         "Lead CRM ID": lm ? lm.crm.ID || "" : "",
         "MLO NMLS": (cm && cm.crm.MLO_NMLS) || (lm && lm.crm.MLO_NMLS) || "",
+        "Matched Fields": (cm && cm.matchedFields) || (lm && lm.matchedFields) || "",
       };
     });
+
+    // Attendees with no CRM Contact/Lead match at all still might work
+    // for an already-known company (a known account, just a new person
+    // there) rather than being a wholly new prospect - check their
+    // Company Name against every company seen across CRM Contacts +
+    // Leads combined.
+    const knownCompanyNames = [
+      ...(crmContacts || []).map((r) => r["Company Name"]),
+      ...(crmLeads || []).map((r) => r["Company Name"]),
+    ].filter(Boolean);
+    const unmatchedIdxs = [];
+    result.forEach((row, idx) => {
+      if (!row.isContactMatch && !row.isLeadMatch) unmatchedIdxs.push(idx);
+    });
+    const companyKnown = Matching.findKnownCompanies(
+      unmatchedIdxs.map((idx) => result[idx]),
+      knownCompanyNames
+    );
+    // findKnownCompanies returns positions into the array we gave it
+    // (0..unmatchedIdxs.length-1), not the original result indices -
+    // translate back so Enrich can look rows up by their real index.
+    const companyKnownByResultIdx = new Set([...companyKnown].map((pos) => unmatchedIdxs[pos]));
 
     onProgress("Categorizing job titles, flagging duplicates and new contacts...");
     await yieldToUi();
     const crmDomains = crmContacts ? Enrich.crmEmailDomains(crmContacts) : new Set();
-    result = Enrich.enrichAndScoreStatus(result, !!crmContacts, !!crmLeads, crmDomains);
+    result = Enrich.enrichAndScoreStatus(result, crmDomains, companyKnownByResultIdx);
 
     result = result.map((row) => ({
       ...row,
@@ -97,10 +120,37 @@
       "Found in CRM": row.isContactMatch || row.isLeadMatch ? "Yes" : "No",
     }));
 
+    // Match Confidence grades *what kind* of evidence backs the Status
+    // conclusion, using one rule for every category: High when an
+    // exact/near-exact identifier (Phone or Email) confirmed or ruled it
+    // out, Medium when only fuzzy text (Name/Company) did, Low when
+    // there was no usable data to compare at all.
+    result = result.map((row) => {
+      const base = row.Status.split(";")[0].trim();
+      let confidence = "";
+      let matchedBy = "";
+      if (base === "Existing Contact" || base === "Existing Lead") {
+        const fields = row["Matched Fields"];
+        confidence = fields.includes("Phone") || fields.includes("Email") ? "High" : "Medium";
+        matchedBy = fields;
+      } else if (base === "New Contact") {
+        confidence = "Medium";
+        matchedBy = "Company (fuzzy)";
+      } else {
+        // New Lead: High if we had a Company Name to actually check
+        // against CRM and it genuinely didn't match anything; Low if
+        // there was no Company Name at all, so "New Lead" here just
+        // means "unverifiable".
+        confidence = String(row["Company Name"] || "").trim() ? "High" : "Low";
+      }
+      return { ...row, "Match Confidence": confidence, "Matched By": matchedBy };
+    });
+
     const displayCols = [
-      "Status", "Found in CRM", "Found in Contacts", "Found in Leads",
+      "Status", "Match Confidence", "Matched By",
+      "Found in CRM", "Found in Contacts", "Found in Leads",
       "Full Name", "Company Name", "Phone", "Email", "Job Title",
-      "Job_Category", "Banks and Credit Unions", "Duplicate", "New Contact",
+      "Job_Category", "Banks and Credit Unions", "Duplicate", "Existing Domain",
       "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
       "NMLS FullName", "NMLS RegulationType", "NMLS LicensingStatus", "NMLS LocationNMLSID", "NMLS LocationName",
     ].filter((c) => c in (result[0] || {}));
@@ -110,8 +160,10 @@
       matchedContacts: result.filter((r) => r.isContactMatch).length,
       matchedLeads: result.filter((r) => r.isLeadMatch).length,
       duplicates: result.filter((r) => r.Duplicate === "Duplicate").length,
-      newContacts: result.filter((r) => r["New Contact"] === "New Contact").length,
-      personalEmails: result.filter((r) => r["New Contact"] === "personal_email").length,
+      newContacts: result.filter((r) => r.Status.split(";")[0].trim() === "New Contact").length,
+      newLeads: result.filter((r) => r.Status.split(";")[0].trim() === "New Lead").length,
+      existingDomainMatches: result.filter((r) => r["Existing Domain"] === "Existing Domain").length,
+      personalEmails: result.filter((r) => r["Existing Domain"] === "personal_email").length,
     };
 
     return { detectedFields, table: result, displayCols, summary };
