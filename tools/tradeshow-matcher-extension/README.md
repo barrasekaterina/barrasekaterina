@@ -25,8 +25,10 @@ an exact/near-exact identifier (Phone/Email), Medium for fuzzy text only
 (Name/Company), Low for no usable data at all. `Existing Account Company`
 / `Existing Lead Company` fuzzy-check whether the company an attendee
 matched to a specific Contact/Lead actually agrees with what's on file
-for that record - blank when there's nothing to compare, never a bare
-`No`.
+for that record; for a `New Contact`/`New Lead` row with no person-level
+match at all, they fall back to the broader per-pool "does this company
+exist anywhere in Contacts/Leads" check instead of staying blank. Blank
+only when there's no Company Name to check against either side.
 
 ## Install (unpacked, for personal/local use)
 

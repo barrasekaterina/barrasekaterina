@@ -89,36 +89,44 @@
     // Attendees with no CRM Contact/Lead match at all still might work
     // for an already-known company (a known account, just a new person
     // there) rather than being a wholly new prospect - check their
-    // Company Name against every company seen across CRM Contacts +
-    // Leads combined.
-    const knownCompanyNames = [
-      ...(crmContacts || []).map((r) => r["Company Name"]),
-      ...(crmLeads || []).map((r) => r["Company Name"]),
-    ].filter(Boolean);
+    // Company Name against every company seen in CRM Contacts and CRM
+    // Leads separately (rather than one combined pool), so Existing
+    // Account Company / Existing Lead Company below can say something
+    // useful even for New Contact/New Lead rows that never matched a
+    // specific person.
+    const knownContactCompanyNames = (crmContacts || []).map((r) => r["Company Name"]).filter(Boolean);
+    const knownLeadCompanyNames = (crmLeads || []).map((r) => r["Company Name"]).filter(Boolean);
     const unmatchedIdxs = [];
     result.forEach((row, idx) => {
       if (!row.isContactMatch && !row.isLeadMatch) unmatchedIdxs.push(idx);
     });
-    const companyKnown = Matching.findKnownCompanies(
-      unmatchedIdxs.map((idx) => result[idx]),
-      knownCompanyNames
-    );
+    const unmatchedRows = unmatchedIdxs.map((idx) => result[idx]);
+    const accountCompanyKnownPositions = Matching.findKnownCompanies(unmatchedRows, knownContactCompanyNames);
+    const leadCompanyKnownPositions = Matching.findKnownCompanies(unmatchedRows, knownLeadCompanyNames);
     // findKnownCompanies returns positions into the array we gave it
     // (0..unmatchedIdxs.length-1), not the original result indices -
-    // translate back so Enrich can look rows up by their real index.
-    const companyKnownByResultIdx = new Set([...companyKnown].map((pos) => unmatchedIdxs[pos]));
+    // translate back so Enrich/the checks below can look rows up by
+    // their real index.
+    const accountCompanyKnownByResultIdx = new Set([...accountCompanyKnownPositions].map((pos) => unmatchedIdxs[pos]));
+    const leadCompanyKnownByResultIdx = new Set([...leadCompanyKnownPositions].map((pos) => unmatchedIdxs[pos]));
+    const companyKnownByResultIdx = new Set([
+      ...accountCompanyKnownByResultIdx,
+      ...leadCompanyKnownByResultIdx,
+    ]);
 
     onProgress("Categorizing job titles, flagging duplicates and new contacts...");
     await yieldToUi();
     const crmDomains = crmContacts ? Enrich.crmEmailDomains(crmContacts) : new Set();
     result = Enrich.enrichAndScoreStatus(result, crmDomains, companyKnownByResultIdx);
 
-    // For a matched attendee, does the company they wrote on the
-    // tradeshow list actually agree with what's on file for that
-    // specific CRM record? Fuzzy, not exact - real company names vary
-    // in spelling/suffixes ("Acme Lending" vs "Acme Lending LLC"). Blank
-    // rather than "No" when there's nothing to compare (no match, or
-    // either side has no company on file at all).
+    // Does the attendee's company check out against CRM? Two cases:
+    // - Matched to a specific Contact/Lead: does their company agree
+    //   (fuzzy) with what's on file for *that* record.
+    // - Not matched (New Contact/New Lead): falls back to the broader
+    //   "does this company exist anywhere in that pool" check computed
+    //   above, so these columns say something useful for New
+    //   Contact/New Lead rows too, not just blank. Still blank when
+    //   there's no Company Name at all to check.
     function compareMatchedCompany(attendeeCompany, matchedCompany) {
       const a = String(attendeeCompany || "").trim().toLowerCase();
       const b = String(matchedCompany || "").trim().toLowerCase();
@@ -126,18 +134,24 @@
       return Matching.jaroWinkler(a, b) >= Matching.COMPANY_THRESHOLD ? "Yes" : "No";
     }
 
-    result = result.map((row) => ({
+    function existingCompanyFlag(attendeeCompany, isMatch, matchedCompany, known) {
+      if (!String(attendeeCompany || "").trim()) return "";
+      if (isMatch) return compareMatchedCompany(attendeeCompany, matchedCompany);
+      return known ? "Yes" : "No";
+    }
+
+    result = result.map((row, idx) => ({
       ...row,
       "Contact CRM Link": row["Contact CRM ID"] ? CRM_CONTACT_URL.replace("{id}", row["Contact CRM ID"]) : "",
       "Lead CRM Link": row["Lead CRM ID"] ? CRM_LEAD_URL.replace("{id}", row["Lead CRM ID"]) : "",
       "Found in Contacts": row.isContactMatch ? "Yes" : "No",
-      "Existing Account Company": row.isContactMatch
-        ? compareMatchedCompany(row["Company Name"], row["Contact Company"])
-        : "",
+      "Existing Account Company": existingCompanyFlag(
+        row["Company Name"], row.isContactMatch, row["Contact Company"], accountCompanyKnownByResultIdx.has(idx)
+      ),
       "Found in Leads": row.isLeadMatch ? "Yes" : "No",
-      "Existing Lead Company": row.isLeadMatch
-        ? compareMatchedCompany(row["Company Name"], row["Lead Company"])
-        : "",
+      "Existing Lead Company": existingCompanyFlag(
+        row["Company Name"], row.isLeadMatch, row["Lead Company"], leadCompanyKnownByResultIdx.has(idx)
+      ),
       "Found in CRM": row.isContactMatch || row.isLeadMatch ? "Yes" : "No",
     }));
 

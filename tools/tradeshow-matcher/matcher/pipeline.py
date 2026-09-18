@@ -133,24 +133,33 @@ def run_pipeline(
             company_map = dict(zip(agg_leads[key], agg_leads["Company Name_crm"]))
             result["Lead Company"] = cleaning.safe_str_series(result["Full Name"].map(company_map))
 
+    def _known_companies(crm: pd.DataFrame | None) -> pd.DataFrame:
+        if crm is None or "Company Name" not in crm.columns:
+            return pd.DataFrame(columns=["Company Name"])
+        companies = crm[["Company Name"]]
+        return companies[cleaning.safe_str_series(companies["Company Name"]).str.strip() != ""].drop_duplicates()
+
     # Attendees with no CRM Contact/Lead match at all still might work for
     # an already-known company (a known account, just a new person there)
     # rather than being a wholly new prospect - check their Company Name
-    # against every company seen across CRM Contacts + Leads combined.
-    known_companies = pd.concat(
-        [df[["Company Name"]] for df in (crm_contacts, crm_leads) if df is not None and "Company Name" in df.columns],
-        ignore_index=True,
-    ) if (crm_contacts is not None or crm_leads is not None) else pd.DataFrame(columns=["Company Name"])
-    known_companies = known_companies[
-        cleaning.safe_str_series(known_companies["Company Name"]).str.strip() != ""
-    ].drop_duplicates()
+    # against every company seen in CRM Contacts and CRM Leads separately
+    # (rather than one combined pool), so Existing Account Company /
+    # Existing Lead Company below can say something useful even for
+    # New Contact/New Lead rows that never matched a specific person.
+    known_contact_companies = _known_companies(crm_contacts)
+    known_lead_companies = _known_companies(crm_leads)
 
     unmatched_mask = ~(result["is_contact_match"] | result["is_lead_match"])
-    company_known = pd.Series(False, index=result.index)
+    account_company_known = pd.Series(False, index=result.index)
+    lead_company_known = pd.Series(False, index=result.index)
     if unmatched_mask.any():
-        company_known.loc[unmatched_mask] = matching.find_known_companies(
-            result.loc[unmatched_mask, ["Company Name"]], known_companies
+        account_company_known.loc[unmatched_mask] = matching.find_known_companies(
+            result.loc[unmatched_mask, ["Company Name"]], known_contact_companies
         )
+        lead_company_known.loc[unmatched_mask] = matching.find_known_companies(
+            result.loc[unmatched_mask, ["Company Name"]], known_lead_companies
+        )
+    company_known = account_company_known | lead_company_known
 
     crm_domains = enrich.crm_email_domains(crm_contacts) if crm_contacts is not None else set()
     result = enrich.enrich_and_score_status(
@@ -200,13 +209,17 @@ def run_pipeline(
         {True: "Yes", False: "No"}
     )
 
-    # For a matched attendee, does the company they wrote on the tradeshow
-    # list actually agree with what's on file for that specific CRM
-    # record? Fuzzy, not exact - real company names vary in spelling and
-    # suffixes ("Acme Lending" vs "Acme Lending LLC"). Blank rather than
-    # "No" when there's nothing to compare (no match, or either side has
-    # no company on file at all) - same "no usable data" philosophy as
-    # Match Confidence's Low tier.
+    # Does the attendee's company check out against CRM? Two cases:
+    # - Matched to a specific Contact/Lead: does their company agree
+    #   (fuzzy) with what's on file for *that* record - same "does this
+    #   specific match hold up" question as Match Confidence.
+    # - Not matched (New Contact/New Lead): falls back to the broader
+    #   "does this company exist anywhere in that pool" check
+    #   (account_company_known/lead_company_known above), so these
+    #   columns say something useful for New Contact/New Lead rows too,
+    #   not just blank. Still blank when there's no Company Name at all
+    #   to check - same "no usable data" philosophy as Match Confidence's
+    #   Low tier.
     def compare_matched_company(attendee_company: str, matched_company: str) -> str:
         attendee_company = str(attendee_company or "").strip().lower()
         matched_company = str(matched_company or "").strip().lower()
@@ -215,16 +228,23 @@ def run_pipeline(
         similarity = matching.jaro_winkler_similarity(attendee_company, matched_company)
         return "Yes" if similarity >= matching.COMPANY_THRESHOLD else "No"
 
+    def existing_company_flag(attendee_company: str, is_match: bool, matched_company: str, known: bool) -> str:
+        if not str(attendee_company or "").strip():
+            return ""
+        if is_match:
+            return compare_matched_company(attendee_company, matched_company)
+        return "Yes" if known else "No"
+
     result["Existing Account Company"] = [
-        compare_matched_company(attendee, contact) if is_match else ""
-        for attendee, contact, is_match in zip(
-            result["Company Name"], result["Contact Company"], result["is_contact_match"]
+        existing_company_flag(attendee, is_match, contact, known)
+        for attendee, is_match, contact, known in zip(
+            result["Company Name"], result["is_contact_match"], result["Contact Company"], account_company_known
         )
     ]
     result["Existing Lead Company"] = [
-        compare_matched_company(attendee, lead) if is_match else ""
-        for attendee, lead, is_match in zip(
-            result["Company Name"], result["Lead Company"], result["is_lead_match"]
+        existing_company_flag(attendee, is_match, lead, known)
+        for attendee, is_match, lead, known in zip(
+            result["Company Name"], result["is_lead_match"], result["Lead Company"], lead_company_known
         )
     ]
 

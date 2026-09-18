@@ -96,17 +96,24 @@ Job_Category-driven `Position`, `Bank/CU`, `Existing Domain`,
 `personal_email`, `Duplicate` - e.g. `Position; Duplicate`, or blank if
 none apply.
 
-`Existing Account Company` / `Existing Lead Company` check, for an
-attendee actually matched to a specific CRM Contact/Lead, whether the
-company they wrote on the tradeshow list agrees with what's on file for
-*that* record - fuzzy (Jaro-Winkler, `COMPANY_THRESHOLD` = 0.85), never
-an exact string check, since real company names vary in spelling/suffixes
-("Acme Lending" vs "Acme Lending LLC"). Blank rather than `No` when
-there's nothing to compare: no match on that side at all, or either side
-has no company on file. This is a different question from `New Contact`
-above - that asks "does this company exist *anywhere* in CRM" for
-attendees with no personal match; this asks "does the company agree with
-the *specific* person we matched."
+`Existing Account Company` / `Existing Lead Company` check whether the
+attendee's company checks out against CRM Contacts / CRM Leads
+respectively, and say something useful either way:
+
+- Matched to a specific Contact/Lead: does the company they wrote on the
+  tradeshow list agree (fuzzy, Jaro-Winkler `COMPANY_THRESHOLD` = 0.85,
+  never an exact string check - real company names vary in spelling and
+  suffixes, e.g. "Acme Lending" vs "Acme Lending LLC") with what's on
+  file for *that specific* record?
+- Not matched at all (`New Contact`/`New Lead`): falls back to the
+  broader "does this company exist anywhere in that pool" check (same
+  one that decides `New Contact` vs `New Lead`, run separately per pool
+  - `NEW_CONTACT_COMPANY_THRESHOLD` = 0.92), so a `New Contact` row can
+  still say `Yes` on `Existing Account Company` even with no person-level
+  match, and a `New Lead` row correctly says `No` on both.
+
+Blank only when there's no Company Name at all to check against either
+side.
 
 `Match Confidence` grades *what kind* of evidence backs that Status
 conclusion, using the same rule for every category - not different logic
