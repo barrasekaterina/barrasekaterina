@@ -81,6 +81,8 @@
         "Lead CRM ID": lm ? lm.crm.ID || "" : "",
         "MLO NMLS": (cm && cm.crm.MLO_NMLS) || (lm && lm.crm.MLO_NMLS) || "",
         "Matched Fields": (cm && cm.matchedFields) || (lm && lm.matchedFields) || "",
+        "Contact Company": cm ? cm.crm["Company Name"] || "" : "",
+        "Lead Company": lm ? lm.crm["Company Name"] || "" : "",
       };
     });
 
@@ -111,12 +113,31 @@
     const crmDomains = crmContacts ? Enrich.crmEmailDomains(crmContacts) : new Set();
     result = Enrich.enrichAndScoreStatus(result, crmDomains, companyKnownByResultIdx);
 
+    // For a matched attendee, does the company they wrote on the
+    // tradeshow list actually agree with what's on file for that
+    // specific CRM record? Fuzzy, not exact - real company names vary
+    // in spelling/suffixes ("Acme Lending" vs "Acme Lending LLC"). Blank
+    // rather than "No" when there's nothing to compare (no match, or
+    // either side has no company on file at all).
+    function compareMatchedCompany(attendeeCompany, matchedCompany) {
+      const a = String(attendeeCompany || "").trim().toLowerCase();
+      const b = String(matchedCompany || "").trim().toLowerCase();
+      if (!a || !b) return "";
+      return Matching.jaroWinkler(a, b) >= Matching.COMPANY_THRESHOLD ? "Yes" : "No";
+    }
+
     result = result.map((row) => ({
       ...row,
       "Contact CRM Link": row["Contact CRM ID"] ? CRM_CONTACT_URL.replace("{id}", row["Contact CRM ID"]) : "",
       "Lead CRM Link": row["Lead CRM ID"] ? CRM_LEAD_URL.replace("{id}", row["Lead CRM ID"]) : "",
       "Found in Contacts": row.isContactMatch ? "Yes" : "No",
+      "Existing Account Company": row.isContactMatch
+        ? compareMatchedCompany(row["Company Name"], row["Contact Company"])
+        : "",
       "Found in Leads": row.isLeadMatch ? "Yes" : "No",
+      "Existing Lead Company": row.isLeadMatch
+        ? compareMatchedCompany(row["Company Name"], row["Lead Company"])
+        : "",
       "Found in CRM": row.isContactMatch || row.isLeadMatch ? "Yes" : "No",
     }));
 
@@ -147,7 +168,8 @@
 
     const displayCols = [
       "Status", "Tags", "Match Confidence", "Matched By",
-      "Found in CRM", "Found in Contacts", "Found in Leads",
+      "Found in CRM", "Found in Contacts", "Existing Account Company",
+      "Found in Leads", "Existing Lead Company",
       "Full Name", "Company Name", "Phone", "Email", "Job Title",
       "Job_Category", "Banks and Credit Unions", "Duplicate", "Existing Domain",
       "Contact CRM Link", "Lead CRM Link", "MLO NMLS",

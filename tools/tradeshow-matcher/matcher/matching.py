@@ -198,6 +198,11 @@ def find_known_companies(unmatched: pd.DataFrame, known_companies: pd.DataFrame)
     return result
 
 
+def jaro_winkler_similarity(a: str, b: str) -> float:
+    import jellyfish
+    return jellyfish.jaro_winkler_similarity(a, b)
+
+
 def aggregate_matches(matched: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
     """Collapse duplicate matches per tradeshow attendee (groupby + join with '; ')."""
     if matched.empty:

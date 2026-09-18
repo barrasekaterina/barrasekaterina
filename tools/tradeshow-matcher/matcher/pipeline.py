@@ -87,6 +87,8 @@ def run_pipeline(
     result["Lead CRM ID"] = ""
     result["MLO NMLS"] = ""
     result["Matched Fields"] = ""
+    result["Contact Company"] = ""
+    result["Lead Company"] = ""
 
     if agg_contacts is not None and not agg_contacts.empty:
         key = "Full Name_tradeshow"
@@ -105,6 +107,9 @@ def run_pipeline(
         if "matched_fields" in agg_contacts.columns:
             fields_map = dict(zip(agg_contacts[key], agg_contacts["matched_fields"]))
             result["Matched Fields"] = cleaning.safe_str_series(result["Full Name"].map(fields_map))
+        if "Company Name_crm" in agg_contacts.columns:
+            company_map = dict(zip(agg_contacts[key], agg_contacts["Company Name_crm"]))
+            result["Contact Company"] = cleaning.safe_str_series(result["Full Name"].map(company_map))
 
     if agg_leads is not None and not agg_leads.empty:
         key = "Full Name_tradeshow"
@@ -124,6 +129,9 @@ def run_pipeline(
             fields_map = dict(zip(agg_leads[key], agg_leads["matched_fields"]))
             lead_fields = cleaning.safe_str_series(result["Full Name"].map(fields_map))
             result["Matched Fields"] = result["Matched Fields"].where(result["Matched Fields"] != "", lead_fields)
+        if "Company Name_crm" in agg_leads.columns:
+            company_map = dict(zip(agg_leads[key], agg_leads["Company Name_crm"]))
+            result["Lead Company"] = cleaning.safe_str_series(result["Full Name"].map(company_map))
 
     # Attendees with no CRM Contact/Lead match at all still might work for
     # an already-known company (a known account, just a new person there)
@@ -192,9 +200,38 @@ def run_pipeline(
         {True: "Yes", False: "No"}
     )
 
+    # For a matched attendee, does the company they wrote on the tradeshow
+    # list actually agree with what's on file for that specific CRM
+    # record? Fuzzy, not exact - real company names vary in spelling and
+    # suffixes ("Acme Lending" vs "Acme Lending LLC"). Blank rather than
+    # "No" when there's nothing to compare (no match, or either side has
+    # no company on file at all) - same "no usable data" philosophy as
+    # Match Confidence's Low tier.
+    def compare_matched_company(attendee_company: str, matched_company: str) -> str:
+        attendee_company = str(attendee_company or "").strip().lower()
+        matched_company = str(matched_company or "").strip().lower()
+        if not attendee_company or not matched_company:
+            return ""
+        similarity = matching.jaro_winkler_similarity(attendee_company, matched_company)
+        return "Yes" if similarity >= matching.COMPANY_THRESHOLD else "No"
+
+    result["Existing Account Company"] = [
+        compare_matched_company(attendee, contact) if is_match else ""
+        for attendee, contact, is_match in zip(
+            result["Company Name"], result["Contact Company"], result["is_contact_match"]
+        )
+    ]
+    result["Existing Lead Company"] = [
+        compare_matched_company(attendee, lead) if is_match else ""
+        for attendee, lead, is_match in zip(
+            result["Company Name"], result["Lead Company"], result["is_lead_match"]
+        )
+    ]
+
     display_cols = [
         "Status", "Tags", "Match Confidence", "Matched By",
-        "Found in CRM", "Found in Contacts", "Found in Leads",
+        "Found in CRM", "Found in Contacts", "Existing Account Company",
+        "Found in Leads", "Existing Lead Company",
         "Full Name", "Company Name", "Phone", "Email", "Job Title",
         "Job_Category", "Banks and Credit Unions", "Duplicate", "Existing Domain",
         "Contact CRM Link", "Lead CRM Link", "MLO NMLS",
